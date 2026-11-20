@@ -1,0 +1,38 @@
+{
+  "name": "Zulora Local - Hyperlocal Quick Commerce",
+  "short_name": "Zulora Local",
+  "description": "Hyperlocal quick commerce by Zulora AI — GPS-driven, dual-role seller & buyer, direct UPI & COD, zero commissions.",
+  "start_url": "./index.html?utm_source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0284C7",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["shopping", "food", "lifestyle"],
+  "shortcuts": [
+    {
+      "name": "My Orders",
+      "url": "./orders.html",
+      "description": "Track your live orders"
+    },
+    {
+      "name": "Seller Dashboard",
+      "url": "./seller.html",
+      "description": "Manage your shop"
+    }
+  ]
+}

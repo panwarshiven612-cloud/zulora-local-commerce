@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0284C7" />
+  <title>Seller Dashboard – Zulora Local</title>
+  <meta name="description" content="Manage your Zulora Local shop: upload products, track orders, and grow your business." />
+  <meta name="robots" content="noindex, nofollow" />
+
+  <!-- PWA / Icons -->
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" type="image/jpeg" />
+  <link rel="apple-touch-icon" href="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="./css/style.css" />
+
+  <style>
+    /* ── Seller-specific styles ──────────────────────────────── */
+    .seller-layout { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+
+    /* Auth Gate */
+    .auth-gate {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 65vh; gap: 1.5rem; text-align: center; padding: 2rem;
+    }
+    .auth-gate-logo { width: 80px; height: 80px; border-radius: 50%; object-fit: cover;
+      box-shadow: 0 4px 20px rgba(2,132,199,.25); }
+    .auth-gate h1 { font-size: 1.6rem; font-weight: 700; color: var(--slate-900); }
+    .auth-gate p { color: var(--slate-500); font-size: .95rem; max-width: 420px; }
+    .btn-seller-login {
+      display: inline-flex; align-items: center; gap: .6rem; padding: .8rem 1.8rem;
+      background: #fff; border: 2px solid var(--azure-600); border-radius: var(--radius-full);
+      font-size: 1rem; font-weight: 600; color: var(--azure-700); cursor: pointer;
+      transition: background var(--transition-fast), box-shadow var(--transition-fast);
+      box-shadow: var(--shadow-azure);
+    }
+    .btn-seller-login:hover { background: var(--azure-50); box-shadow: 0 6px 24px rgba(2,132,199,.22); }
+
+    /* Dashboard section */
+    #dashboardSection { display: none; }
+    #dashboardSection.visible { display: block; }
+
+    /* Top bar */
+    .seller-topbar {
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+      background: var(--pearl-glass); border: 1px solid var(--slate-200);
+      border-radius: var(--radius-lg); padding: 1rem 1.4rem;
+      backdrop-filter: blur(14px); margin-bottom: 1.5rem;
+      box-shadow: var(--shadow-md);
+    }
+    .seller-topbar-name { font-size: 1.1rem; font-weight: 700; color: var(--slate-900); flex: 1; }
+    .shop-status-wrap { display: flex; align-items: center; gap: .6rem; }
+    .toggle-switch {
+      position: relative; width: 50px; height: 26px; cursor: pointer;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: var(--slate-300);
+      border-radius: var(--radius-full); transition: background .28s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute; height: 20px; width: 20px;
+      left: 3px; top: 3px; background: white; border-radius: 50%;
+      transition: transform .28s; box-shadow: var(--shadow-sm);
+    }
+    .toggle-switch input:checked + .toggle-slider { background: var(--emerald-500); }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(24px); }
+    #shopStatusLabel { font-size: .85rem; font-weight: 600; color: var(--slate-600); min-width: 60px; }
+
+    /* KPI Stats */
+    .kpi-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .kpi-card {
+      background: var(--pearl-glass); border: 1px solid var(--slate-200);
+      border-radius: var(--radius-lg); padding: 1.2rem 1.4rem;
+      backdrop-filter: blur(14px); box-shadow: var(--shadow-sm);
+    }
+    .kpi-label { font-size: .78rem; font-weight: 600; color: var(--slate-500); text-transform: uppercase; letter-spacing: .04em; }
+    .kpi-value { font-size: 1.7rem; font-weight: 800; color: var(--slate-900); margin-top: .3rem; }
+    .kpi-value.azure { color: var(--azure-600); }
+    .kpi-value.emerald { color: var(--emerald-600); }
+    .kpi-value.amber { color: var(--amber-500); }
+
+    /* Section cards */
+    .seller-card {
+      background: var(--pearl-glass); border: 1px solid var(--slate-200);
+      border-radius: var(--radius-lg); padding: 1.4rem; margin-bottom: 1.5rem;
+      backdrop-filter: blur(14px); box-shadow: var(--shadow-md);
+    }
+    .seller-card-title {
+      font-size: 1.05rem; font-weight: 700; color: var(--slate-900);
+      margin-bottom: 1.1rem; display: flex; align-items: center; gap: .5rem;
+    }
+
+    /* Form styles */
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: .85rem; }
+    .form-group { display: flex; flex-direction: column; gap: .3rem; }
+    .form-group label { font-size: .8rem; font-weight: 600; color: var(--slate-600); }
+    .form-group input, .form-group select, .form-group textarea {
+      padding: .6rem .9rem; border: 1.5px solid var(--slate-200); border-radius: var(--radius-sm);
+      font-size: .9rem; color: var(--slate-900); background: #fff;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+      outline: none;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      border-color: var(--azure-500); box-shadow: 0 0 0 3px rgba(2,132,199,.12);
+    }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+    .form-full { grid-column: 1 / -1; }
+
+    /* Multi-image upload */
+    .upload-zone {
+      border: 2px dashed var(--azure-400); border-radius: var(--radius-md);
+      padding: 1.4rem; text-align: center; cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+      background: var(--azure-50);
+    }
+    .upload-zone:hover { background: var(--azure-100); border-color: var(--azure-600); }
+    .upload-zone input[type="file"] { display: none; }
+    .upload-zone-label { font-size: .9rem; color: var(--azure-700); font-weight: 600; cursor: pointer; display: block; }
+    .upload-zone-hint { font-size: .78rem; color: var(--slate-500); margin-top: .3rem; }
+
+    /* Image previews */
+    #imagePreviewGrid {
+      display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .8rem; min-height: 0;
+    }
+    .preview-thumb {
+      width: 72px; height: 72px; object-fit: cover; border-radius: var(--radius-sm);
+      border: 2px solid var(--azure-200); box-shadow: var(--shadow-sm);
+    }
+
+    /* Progress bars */
+    #multiUploadProgress { margin-top: .8rem; display: flex; flex-direction: column; gap: .4rem; }
+    .progress-bar-wrap {
+      display: flex; align-items: center; gap: .6rem;
+    }
+    .progress-bar-label { font-size: .78rem; color: var(--slate-600); min-width: 60px; }
+    .progress-bar-track {
+      flex: 1; height: 8px; background: var(--slate-200); border-radius: var(--radius-full); overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%; background: var(--azure-500); border-radius: var(--radius-full);
+      transition: width .2s;
+    }
+
+    /* Products table */
+    .products-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    .products-table th {
+      text-align: left; padding: .6rem .8rem; background: var(--azure-50);
+      color: var(--azure-700); font-weight: 700; border-bottom: 2px solid var(--azure-100);
+    }
+    .products-table td {
+      padding: .7rem .8rem; border-bottom: 1px solid var(--slate-100); vertical-align: middle;
+    }
+    .products-table tr:hover td { background: var(--azure-50); }
+    .product-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: var(--radius-sm); }
+    .product-name { font-weight: 600; color: var(--slate-900); }
+    .product-cat { font-size: .75rem; color: var(--slate-500); }
+    .img-count-badge {
+      display: inline-block; background: var(--azure-600); color: #fff;
+      border-radius: var(--radius-full); font-size: .68rem; font-weight: 700;
+      padding: 1px 6px; margin-left: 4px; vertical-align: middle;
+    }
+
+    /* Stock controls */
+    .stock-ctrl { display: flex; align-items: center; gap: .4rem; }
+    .stock-ctrl button {
+      width: 26px; height: 26px; border: 1.5px solid var(--azure-400); background: #fff;
+      border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center;
+      justify-content: center; color: var(--azure-700); font-weight: 700;
+      transition: background var(--transition-fast);
+    }
+    .stock-ctrl button:hover { background: var(--azure-100); }
+    .stock-num { min-width: 30px; text-align: center; font-weight: 700; color: var(--slate-900); }
+
+    /* Status badge / toggle */
+    .status-pill {
+      display: inline-block; padding: 2px 10px; border-radius: var(--radius-full);
+      font-size: .78rem; font-weight: 700; cursor: pointer;
+    }
+    .status-pill.instock { background: var(--emerald-100); color: var(--emerald-600); }
+    .status-pill.outstock { background: var(--rose-100); color: var(--rose-500); }
+
+    /* Order cards */
+    .order-card {
+      border: 1.5px solid var(--slate-200); border-radius: var(--radius-lg);
+      padding: 1.1rem; margin-bottom: 1rem; background: #fff;
+      box-shadow: var(--shadow-sm);
+    }
+    .order-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; margin-bottom: .8rem; }
+    .order-id { font-size: .82rem; font-weight: 700; color: var(--azure-700); }
+    .order-time { font-size: .78rem; color: var(--slate-500); }
+    .order-buyer { font-weight: 600; color: var(--slate-900); font-size: .95rem; }
+    .order-address { font-size: .82rem; color: var(--slate-500); margin-top: .2rem; }
+    .order-items-list { margin: .7rem 0; padding: .6rem; background: var(--slate-100); border-radius: var(--radius-sm); }
+    .order-item-row { font-size: .84rem; color: var(--slate-700); padding: .2rem 0; }
+    .order-total { font-size: .95rem; font-weight: 700; color: var(--slate-900); margin-top: .4rem; }
+    .order-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .8rem; }
+    .order-status-btn {
+      padding: .4rem .9rem; border-radius: var(--radius-full); font-size: .8rem; font-weight: 600;
+      cursor: pointer; border: 1.5px solid var(--azure-400); background: #fff; color: var(--azure-700);
+      transition: background var(--transition-fast), color var(--transition-fast);
+    }
+    .order-status-btn:hover, .order-status-btn.active { background: var(--azure-600); color: #fff; border-color: var(--azure-600); }
+    .order-contact-btns { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .6rem; }
+    .btn-call {
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .4rem .9rem; border-radius: var(--radius-full);
+      background: var(--emerald-100); color: var(--emerald-600);
+      font-size: .8rem; font-weight: 700; text-decoration: none;
+      border: 1.5px solid var(--emerald-500);
+    }
+    .btn-whatsapp {
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .4rem .9rem; border-radius: var(--radius-full);
+      background: #E7FBF0; color: #25D366;
+      font-size: .8rem; font-weight: 700; text-decoration: none;
+      border: 1.5px solid #25D366;
+    }
+    .btn-maps {
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .4rem .9rem; border-radius: var(--radius-full);
+      background: var(--azure-100); color: var(--azure-700);
+      font-size: .8rem; font-weight: 700; text-decoration: none;
+      border: 1.5px solid var(--azure-400);
+    }
+
+    /* Shop profile form */
+    .slider-row { display: flex; align-items: center; gap: .8rem; }
+    .slider-row input[type="range"] { flex: 1; accent-color: var(--azure-600); }
+    .slider-val { font-weight: 700; color: var(--azure-700); min-width: 48px; }
+
+    /* Commission Ledger */
+    .ledger-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(170px,1fr)); gap: 1rem; margin-bottom: 1rem;
+    }
+    .ledger-item { background: var(--azure-50); border-radius: var(--radius-md); padding: .9rem 1rem; }
+    .ledger-item-label { font-size: .78rem; font-weight: 600; color: var(--slate-500); text-transform: uppercase; }
+    .ledger-item-value { font-size: 1.3rem; font-weight: 800; color: var(--slate-900); margin-top: .2rem; }
+    .ledger-note {
+      font-size: .82rem; color: var(--slate-500); background: var(--amber-100);
+      padding: .7rem 1rem; border-radius: var(--radius-sm); line-height: 1.6;
+    }
+
+    /* Utility */
+    .btn-primary {
+      display: inline-block; padding: .65rem 1.4rem; background: var(--azure-600);
+      color: #fff; border: none; border-radius: var(--radius-full); font-size: .9rem;
+      font-weight: 600; cursor: pointer; transition: background var(--transition-fast);
+    }
+    .btn-primary:hover { background: var(--azure-700); }
+    .btn-danger {
+      display: inline-block; padding: .4rem .9rem; background: var(--rose-100);
+      color: var(--rose-600); border: 1.5px solid var(--rose-500); border-radius: var(--radius-full);
+      font-size: .78rem; font-weight: 700; cursor: pointer;
+    }
+    .btn-ghost {
+      padding: .5rem 1rem; background: transparent; border: 1.5px solid var(--slate-300);
+      border-radius: var(--radius-full); font-size: .88rem; font-weight: 600;
+      color: var(--slate-700); cursor: pointer;
+    }
+    .hidden { display: none !important; }
+    .mt-1 { margin-top: .5rem; }
+    .mt-2 { margin-top: 1rem; }
+    .text-sm { font-size: .82rem; color: var(--slate-500); }
+    .empty-state { text-align: center; padding: 2.5rem; color: var(--slate-500); }
+    .empty-state .empty-icon { font-size: 2.5rem; margin-bottom: .5rem; }
+    .live-orders-header {
+      display: flex; align-items: center; gap: .5rem; margin-bottom: .8rem;
+    }
+    .live-dot {
+      width: 10px; height: 10px; background: var(--emerald-500);
+      border-radius: 50%; animation: pulse-dot 1.4s infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: .5; transform: scale(0.7); }
+    }
+
+    @media (max-width: 600px) {
+      .kpi-grid { grid-template-columns: 1fr 1fr; }
+      .seller-topbar { flex-direction: column; align-items: flex-start; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════
+       NAVBAR
+  ═══════════════════════════════════════════════ -->
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Zulora Local Logo" class="navbar-logo" />
+      <div class="navbar-brand-text">
+        <span class="brand-name">Zulora Local</span>
+        <span class="brand-sub">by Zulora AI</span>
+      </div>
+    </div>
+
+    <div class="navbar-actions">
+      <a href="./index.html" class="btn btn-seller">🛍️ Buyer Storefront</a>
+      <a href="./orders.html" class="btn btn-orders">📦 My Orders</a>
+      <button id="btnSellerLogout" class="btn btn-signout hidden">🚪 Logout</button>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════
+       AUTH GATE
+  ═══════════════════════════════════════════════ -->
+  <section id="authSection" class="auth-gate">
+    <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Zulora" class="auth-gate-logo" />
+    <h1>🛒 Seller / Merchant Mode</h1>
+    <p>Sign in with your Google account to activate your seller dashboard, manage products, and receive live orders from buyers near you.</p>
+    <button id="btnSellerLogin" class="btn-seller-login">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20" height="20">
+        <path fill="#4285F4" d="M24 9.5c3.1 0 5.8 1.1 8 2.9l5.9-5.9C34.4 3.5 29.5 1.5 24 1.5 14.9 1.5 7.2 7.1 4 15l6.9 5.4C12.5 13.6 17.8 9.5 24 9.5z"/>
+        <path fill="#34A853" d="M46.5 24c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.4 5.7C43.4 36.9 46.5 30.9 46.5 24z"/>
+        <path fill="#FBBC05" d="M10.9 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.1.8-4.6L3.4 14C1.8 17.1 1 20.5 1 24s.8 6.9 2.4 10l7.5-5.4z"/>
+        <path fill="#EA4335" d="M24 46.5c5.5 0 10.1-1.8 13.5-4.9l-7.4-5.7c-1.8 1.2-4.2 1.9-6.1 1.9-6.2 0-11.5-4.1-13.1-9.9l-6.9 5.4C7.2 40.9 14.9 46.5 24 46.5z"/>
+      </svg>
+      Sign in with Google to activate Seller / Merchant Mode
+    </button>
+    <p class="text-sm">🔒 Your data stays private. We only access your name and email to create your seller profile.</p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       DASHBOARD SECTION
+  ═══════════════════════════════════════════════ -->
+  <div id="dashboardSection" class="seller-layout">
+
+    <!-- TOP BAR: seller name + shop status toggle -->
+    <div class="seller-topbar">
+      <div class="seller-topbar-name">
+        👋 Hello, <span id="sellerNameDisplay">Seller</span>
+      </div>
+      <div class="shop-status-wrap">
+        <span style="font-size:.85rem;font-weight:600;color:var(--slate-600);">Shop Status:</span>
+        <label class="toggle-switch" for="shopStatusToggle" aria-label="Open/Closed toggle">
+          <input type="checkbox" id="shopStatusToggle" />
+          <span class="toggle-slider"></span>
+        </label>
+        <span id="shopStatusLabel">Closed</span>
+      </div>
+    </div>
+
+    <!-- KPI STATS GRID -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">💰 Total GMV</div>
+        <div class="kpi-value azure" id="statTotalSales">₹0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">📦 Total Orders</div>
+        <div class="kpi-value emerald" id="statTotalOrders">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">🏷️ Active Products</div>
+        <div class="kpi-value" id="statActiveProducts">0</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">📊 Commission Owed (3%)</div>
+        <div class="kpi-value amber" id="statCommissionOwed">₹0</div>
+      </div>
+    </div>
+
+    <!-- ─── PRODUCT UPLOAD FORM ─── -->
+    <div class="seller-card">
+      <div class="seller-card-title">📤 Upload New Product</div>
+      <form id="productUploadForm" autocomplete="off">
+        <div class="form-grid">
+          <div class="form-group form-full">
+            <label for="productTitle">Product Title *</label>
+            <input type="text" id="productTitle" placeholder="e.g. Fresh Alphonso Mangoes 1kg" required />
+          </div>
+
+          <div class="form-group">
+            <label for="productCategory">Category *</label>
+            <select id="productCategory" required>
+              <option value="">— Select Category —</option>
+              <option value="Food">🍕 Food</option>
+              <option value="Crops">🌾 Crops</option>
+              <option value="Electronics">📱 Electronics</option>
+              <option value="Sweets">🍬 Sweets</option>
+              <option value="Grocery">🛒 Grocery</option>
+              <option value="Fashion">👗 Fashion</option>
+              <option value="Toys">🧸 Toys</option>
+              <option value="add_custom">➕ Add Custom Category</option>
+            </select>
+          </div>
+
+          <div class="form-group hidden" id="customCategoryGroup">
+            <label for="customCategoryInput">Custom Category Name</label>
+            <input type="text" id="customCategoryInput" placeholder="e.g. Handicrafts, Dairy, Herbs…" />
+          </div>
+
+          <div class="form-group">
+            <label for="productPrice">Selling Price (₹) *</label>
+            <input type="number" id="productPrice" placeholder="e.g. 149" min="0" step="0.01" required />
+          </div>
+
+          <div class="form-group">
+            <label for="productMrp">MRP / Original Price (₹)</label>
+            <input type="number" id="productMrp" placeholder="e.g. 199" min="0" step="0.01" />
+          </div>
+
+          <div class="form-group">
+            <label for="productUnit">Unit / Quantity</label>
+            <input type="text" id="productUnit" placeholder="e.g. 1kg, 500ml, 1pc" />
+          </div>
+
+          <div class="form-group">
+            <label for="productWeightKg">Weight (kg)</label>
+            <input type="number" id="productWeightKg" placeholder="e.g. 1.0" min="0" step="0.01" />
+          </div>
+
+          <div class="form-group">
+            <label for="productStock">Stock Count *</label>
+            <input type="number" id="productStock" placeholder="e.g. 50" min="0" required />
+          </div>
+
+          <!-- Multi-image upload -->
+          <div class="form-group form-full">
+            <label>Upload Multiple Product Images (simultaneous)</label>
+            <div class="upload-zone" onclick="document.getElementById('productImages').click()">
+              <input type="file" id="productImages" accept="image/*" multiple />
+              <label class="upload-zone-label">📷 Click to browse or drag images here</label>
+              <div class="upload-zone-hint">Select up to 6 images • PNG, JPG, WEBP • Max 10MB each</div>
+            </div>
+            <!-- Image previews -->
+            <div id="imagePreviewGrid"></div>
+            <!-- Per-file progress bars -->
+            <div id="multiUploadProgress"></div>
+          </div>
+        </div>
+
+        <div class="mt-2" style="display:flex;gap:.8rem;flex-wrap:wrap;">
+          <button type="submit" id="btnSubmitProduct" class="btn-primary">➕ Upload Product to Store</button>
+          <button type="button" class="btn-ghost" onclick="document.getElementById('productUploadForm').reset();document.getElementById('imagePreviewGrid').innerHTML='';document.getElementById('multiUploadProgress').innerHTML='';">✕ Clear Form</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ─── PRODUCTS INVENTORY TABLE ─── -->
+    <div class="seller-card">
+      <div class="seller-card-title">🗂️ My Product Inventory</div>
+      <div style="overflow-x:auto;">
+        <table class="products-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Price</th>
+              <th>Stock</th>
+              <th>Status</th>
+              <th>Age</th>
+              <th>Sales</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="productsTableBody">
+            <tr>
+              <td colspan="7" class="empty-state">
+                <div class="empty-icon">📦</div>
+                <p>No products yet — upload your first product above!</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── LIVE INCOMING ORDERS ─── -->
+    <div class="seller-card">
+      <div class="live-orders-header">
+        <div class="live-dot"></div>
+        <div class="seller-card-title" style="margin-bottom:0;">Live Incoming Orders</div>
+      </div>
+      <div id="liveOrdersContainer">
+        <div class="empty-state">
+          <div class="empty-icon">🛵</div>
+          <p>No orders yet. When buyers place orders from your shop, they'll appear here in real time.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── SHOP PROFILE FORM ─── -->
+    <div class="seller-card">
+      <div class="seller-card-title">🏪 Shop Profile & Settings</div>
+      <form id="shopProfileForm" autocomplete="off">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="shopName">Shop Name *</label>
+            <input type="text" id="shopName" placeholder="e.g. Ravi's Fresh Mart" required />
+          </div>
+
+          <div class="form-group">
+            <label for="shopHandle">@Handle (unique)</label>
+            <input type="text" id="shopHandle" placeholder="e.g. ravis_fresh_mart" />
+          </div>
+
+          <div class="form-group">
+            <label for="shopCategory">Shop Category</label>
+            <select id="shopCategory">
+              <option value="">— Select —</option>
+              <option value="Food">Food</option>
+              <option value="Crops">Crops</option>
+              <option value="Electronics">Electronics</option>
+              <option value="Sweets">Sweets</option>
+              <option value="Grocery">Grocery</option>
+              <option value="Fashion">Fashion</option>
+              <option value="Toys">Toys</option>
+              <option value="Mixed">Mixed / General</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="shopPhone">Phone Number</label>
+            <input type="tel" id="shopPhone" placeholder="e.g. 9876543210" />
+          </div>
+
+          <div class="form-group">
+            <label for="shopUpiId">UPI ID (for payments)</label>
+            <input type="text" id="shopUpiId" placeholder="e.g. seller@upi" />
+          </div>
+
+          <div class="form-group form-full">
+            <label for="shopDeliveryRadius">Delivery Radius: <span id="shopRadiusVal">5</span> km</label>
+            <div class="slider-row">
+              <span class="text-sm">1 km</span>
+              <input type="range" id="shopDeliveryRadius" min="1" max="25" value="5" step="0.5" />
+              <span class="text-sm">25 km</span>
+            </div>
+          </div>
+
+          <div class="form-group form-full">
+            <label for="shopDescription">Shop Description</label>
+            <textarea id="shopDescription" placeholder="Tell buyers what makes your shop special…"></textarea>
+          </div>
+
+          <div class="form-group form-full">
+            <label>📍 Shop GPS Location</label>
+            <div style="display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;">
+              <button type="button" id="btnCaptureShopGps" class="btn-primary" style="font-size:.85rem;padding:.5rem 1.1rem;">🛰️ Capture My GPS</button>
+              <input type="number" id="shopLat" placeholder="Latitude" step="any" style="width:140px;" />
+              <input type="number" id="shopLng" placeholder="Longitude" step="any" style="width:140px;" />
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-2">
+          <button type="submit" class="btn-primary">💾 Save Shop Profile</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ─── COMMISSION LEDGER ─── -->
+    <div class="seller-card">
+      <div class="seller-card-title">📊 Commission Ledger</div>
+      <div class="ledger-grid">
+        <div class="ledger-item">
+          <div class="ledger-item-label">✅ Delivered Orders</div>
+          <div class="ledger-item-value" id="ledgerDeliveredCount">0</div>
+        </div>
+        <div class="ledger-item">
+          <div class="ledger-item-label">💰 Total GMV (Delivered)</div>
+          <div class="ledger-item-value" id="ledgerGmv">₹0.00</div>
+        </div>
+        <div class="ledger-item">
+          <div class="ledger-item-label">📊 3% Commission</div>
+          <div class="ledger-item-value" id="ledgerCommission">₹0.00</div>
+        </div>
+      </div>
+      <div class="ledger-note">
+        💡 <strong>Bi-weekly Settlement:</strong> Zulora deducts 3% platform commission from your delivered GMV every two weeks. Settlement details and invoices are sent to <a href="mailto:zulora.help@gmail.com" style="color:var(--azure-600);font-weight:600;">zulora.help@gmail.com</a>. Contact us for disputes or early settlement requests.
+      </div>
+    </div>
+
+  </div><!-- /seller-layout -->
+
+  <!-- ═══════════════════════════════════════════════
+       TOAST CONTAINER
+  ═══════════════════════════════════════════════ -->
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- ═══════════════════════════════════════════════
+       SCRIPTS
+  ═══════════════════════════════════════════════ -->
+  <script type="module" src="./js/pwa.js"></script>
+  <script type="module" src="./js/seller.js"></script>
+</body>
+</html>

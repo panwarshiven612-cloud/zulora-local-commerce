@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#6C63FF" />
+
+  <!-- SEO Meta Tags -->
+  <title>Zulora Local – Hyperlocal Quick Commerce Near You</title>
+  <meta name="description" content="Zulora Local is your hyperlocal quick commerce platform. Buy fresh food, groceries, electronics, fashion and more from sellers right in your neighbourhood." />
+  <meta name="keywords" content="Zulora Local, hyperlocal commerce, quick commerce, local sellers, groceries, food, electronics, nearby shops, Zulora AI" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://zulora-local.vercel.app/" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Zulora Local – Hyperlocal Quick Commerce Near You" />
+  <meta property="og:description" content="Buy from local sellers near you – fresh food, groceries, electronics, fashion and more, delivered fast with Zulora Local." />
+  <meta property="og:image" content="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://zulora-local.vercel.app/" />
+  <meta property="og:site_name" content="Zulora Local" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Zulora Local – Hyperlocal Quick Commerce Near You" />
+  <meta name="twitter:description" content="Buy from local sellers near you – fresh food, groceries, electronics, fashion and more, delivered fast with Zulora Local." />
+  <meta name="twitter:image" content="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" />
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  [
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Zulora Local",
+      "url": "https://zulora-local.vercel.app",
+      "description": "Hyperlocal Quick Commerce Platform by Zulora AI",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://zulora-local.vercel.app/?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "Zulora Local",
+      "telephone": "+916395211325",
+      "email": "zulora.help@gmail.com",
+      "url": "https://zulora-local.vercel.app",
+      "logo": "https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg",
+      "description": "Hyperlocal Quick Commerce Platform connecting buyers with local sellers nearby.",
+      "priceRange": "₹"
+    }
+  ]
+  </script>
+
+  <!-- PWA / Icons -->
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" type="image/jpeg" />
+  <link rel="apple-touch-icon" href="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════
+       NAVBAR
+  ═══════════════════════════════════════════════ -->
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Zulora Local Logo" class="navbar-logo" />
+      <div class="navbar-brand-text">
+        <span class="brand-name">Zulora Local</span>
+        <span class="brand-sub">by Zulora AI</span>
+      </div>
+    </div>
+
+    <div class="navbar-actions">
+      <a href="./seller.html" class="btn btn-seller">🛒 Seller Mode / My Shop</a>
+      <a href="./orders.html" class="btn btn-orders">📦 My Orders</a>
+      <a href="./admin.html" id="navAdminLink" class="btn btn-admin hidden">⚙️ Admin</a>
+      <button id="btnInstallApp" class="btn btn-install hidden">📲 Install App</button>
+
+      <!-- Notification Bell -->
+      <button id="btnNotifBell" class="btn btn-icon" aria-label="Notifications">
+        🔔 <span id="notifBadge" class="hidden">0</span>
+      </button>
+
+      <!-- Auth -->
+      <button id="authBtn" class="btn btn-auth">
+        <svg class="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="18" height="18">
+          <path fill="#4285F4" d="M24 9.5c3.1 0 5.8 1.1 8 2.9l5.9-5.9C34.4 3.5 29.5 1.5 24 1.5 14.9 1.5 7.2 7.1 4 15l6.9 5.4C12.5 13.6 17.8 9.5 24 9.5z"/>
+          <path fill="#34A853" d="M46.5 24c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.4 5.7C43.4 36.9 46.5 30.9 46.5 24z"/>
+          <path fill="#FBBC05" d="M10.9 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.1.8-4.6L3.4 14C1.8 17.1 1 20.5 1 24s.8 6.9 2.4 10l7.5-5.4z"/>
+          <path fill="#EA4335" d="M24 46.5c5.5 0 10.1-1.8 13.5-4.9l-7.4-5.7c-1.8 1.2-4.2 1.9-6.1 1.9-6.2 0-11.5-4.1-13.1-9.9l-6.9 5.4C7.2 40.9 14.9 46.5 24 46.5z"/>
+        </svg>
+        Sign in with Google
+      </button>
+
+      <div id="userMenu" class="user-menu hidden">
+        <img id="userAvatar" src="" alt="User Avatar" class="user-avatar" />
+        <span id="userName" class="user-name"></span>
+        <button id="signOutBtn" class="btn btn-signout">Sign Out</button>
+      </div>
+
+      <!-- Refresh -->
+      <button id="btnRefreshData" class="btn btn-icon" aria-label="Refresh">↻ Refresh</button>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════
+       PWA INSTALL BANNER
+  ═══════════════════════════════════════════════ -->
+  <div id="pwaInstallBanner" class="pwa-install-banner hidden" role="banner">
+    <div class="pwa-install-content">
+      <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Zulora Local" class="pwa-install-logo" />
+      <div class="pwa-install-text">
+        <strong>Install Zulora App</strong>
+        <span>Get fast access, offline support & notifications</span>
+      </div>
+    </div>
+    <div class="pwa-install-actions">
+      <button id="btnPwaInstall" class="btn btn-primary">Install</button>
+      <button id="btnPwaDismiss" class="btn btn-ghost">✕ Dismiss</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       LOCATION BANNER
+  ═══════════════════════════════════════════════ -->
+  <div class="location-banner">
+    <div class="location-info">
+      <span class="location-pin">📍</span>
+      <span id="locationTownText" class="location-town">Detecting location…</span>
+    </div>
+    <div class="location-controls">
+      <button id="btnDetectGps" class="btn btn-gps">🛰️ Detect GPS</button>
+      <button id="btnManualLocation" class="btn btn-manual">✏️ Change</button>
+    </div>
+    <div class="location-filter">
+      <button id="filterAllBtn" class="filter-btn active">All Products</button>
+      <button id="filterNearbyBtn" class="filter-btn">⚡ Nearby Only</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       SEARCH HERO
+  ═══════════════════════════════════════════════ -->
+  <section class="search-hero" aria-label="Product Search">
+    <div class="search-wrapper">
+      <span class="search-icon" aria-hidden="true">🔍</span>
+      <input
+        type="search"
+        id="searchInput"
+        class="search-input"
+        placeholder="Search products, shops, categories…"
+        autocomplete="off"
+        aria-label="Search products"
+      />
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       CATEGORY SCROLL BAR
+  ═══════════════════════════════════════════════ -->
+  <div id="categoryScroll" class="category-scroll" role="list" aria-label="Product Categories">
+    <div class="category-pill active" data-category="All" role="listitem" tabindex="0">🏪 All Items</div>
+    <div class="category-pill" data-category="Food" role="listitem" tabindex="0">🍕 Food</div>
+    <div class="category-pill" data-category="Crops" role="listitem" tabindex="0">🌾 Crops</div>
+    <div class="category-pill" data-category="Electronics" role="listitem" tabindex="0">📱 Electronics</div>
+    <div class="category-pill" data-category="Sweets" role="listitem" tabindex="0">🍬 Sweets</div>
+    <div class="category-pill" data-category="Grocery" role="listitem" tabindex="0">🛒 Grocery</div>
+    <div class="category-pill" data-category="Fashion" role="listitem" tabindex="0">👗 Fashion</div>
+    <div class="category-pill" data-category="Toys" role="listitem" tabindex="0">🧸 Toys</div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       MAIN CONTENT — PRODUCT GRID
+  ═══════════════════════════════════════════════ -->
+  <main class="main-content" id="mainContent">
+    <div class="section-header">
+      <h2 class="section-title">⚡ Zulora Local Showcase</h2>
+      <span id="productCount" class="product-count">Loading products…</span>
+    </div>
+
+    <div id="productGrid" class="product-grid" role="list" aria-label="Products">
+      <!-- Product cards injected by app.js
+           Each card structure (reference for JS):
+           <div class="product-card" role="listitem">
+             <div class="card-carousel">
+               <button class="carousel-prev" aria-label="Previous image">‹</button>
+               <div class="carousel-images">
+                 <img class="carousel-img active" src="..." alt="..." />
+               </div>
+               <button class="carousel-next" aria-label="Next image">›</button>
+               <div class="carousel-dots"></div>
+             </div>
+             <div class="card-body">
+               <h3 class="card-title"></h3>
+               <p class="card-price"></p>
+               <p class="card-seller"></p>
+               <button class="btn-add-cart">Add to Cart</button>
+             </div>
+           </div>
+      -->
+    </div>
+  </main>
+
+  <!-- ═══════════════════════════════════════════════
+       NOTIFICATION DRAWER
+  ═══════════════════════════════════════════════ -->
+  <aside id="notifDrawer" class="drawer notif-drawer hidden" aria-label="Notifications" role="complementary">
+    <div class="drawer-header">
+      <h3 class="drawer-title">Notifications</h3>
+      <div class="drawer-header-actions">
+        <button id="btnMarkAllRead" class="btn btn-ghost btn-sm">✓ Mark all read</button>
+        <button id="btnCloseNotifDrawer" class="btn btn-icon" aria-label="Close notifications">✕</button>
+      </div>
+    </div>
+    <div class="drawer-body">
+      <div id="notifDrawerList" class="notif-list">
+        <!-- Notifications injected by app.js -->
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════
+       FLOATING CART BAR
+  ═══════════════════════════════════════════════ -->
+  <div id="floatingCartBar" class="floating-cart-bar hidden" role="complementary" aria-label="Cart summary">
+    <div class="floating-cart-info">
+      <span class="cart-count-badge"><span id="floatingCartCount">0</span> items</span>
+      <span class="cart-total">₹<span id="floatingCartTotal">0.00</span></span>
+    </div>
+    <button id="btnOpenCart" class="btn btn-primary">View Cart &amp; Checkout →</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       CART DRAWER
+  ═══════════════════════════════════════════════ -->
+  <aside id="cartDrawer" class="drawer cart-drawer" aria-label="Shopping Cart" role="complementary">
+    <div class="drawer-header">
+      <div class="cart-header-top">
+        <h3 class="drawer-title">🛒 Shopping Cart</h3>
+        <button id="closeCartDrawer" class="btn btn-icon" aria-label="Close cart">✕</button>
+      </div>
+      <div class="cart-smart-label">
+        <span class="smart-badge">✦ Smart Multi-Shop Splitting</span>
+        <span class="smart-desc">Your order is split per seller for fastest delivery</span>
+      </div>
+    </div>
+    <div class="drawer-body">
+      <div id="cartDrawerBody" class="cart-drawer-body">
+        <!-- Cart items injected by app.js -->
+      </div>
+    </div>
+    <div class="drawer-footer">
+      <div id="cartDrawerFooter" class="cart-drawer-footer">
+        <!-- Cart totals & checkout button injected by app.js -->
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════
+       DRAWER BACKDROP
+  ═══════════════════════════════════════════════ -->
+  <div id="drawerBackdrop" class="drawer-backdrop" aria-hidden="true"></div>
+
+  <!-- ═══════════════════════════════════════════════
+       TOAST CONTAINER
+  ═══════════════════════════════════════════════ -->
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- ═══════════════════════════════════════════════
+       FOOTER
+  ═══════════════════════════════════════════════ -->
+  <footer class="site-footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Zulora Local" class="footer-logo" />
+        <div>
+          <div class="footer-name">Zulora Local</div>
+          <div class="footer-tagline">Hyperlocal Quick Commerce by Zulora AI</div>
+        </div>
+      </div>
+      <div class="footer-contact">
+        <div class="footer-contact-title">Helpline &amp; Support</div>
+        <a href="mailto:zulora.help@gmail.com" class="footer-contact-link">📧 zulora.help@gmail.com</a>
+        <a href="tel:+916395211325" class="footer-contact-link">📞 +91 6395211325</a>
+        <a href="https://wa.me/916395211325" target="_blank" rel="noopener noreferrer" class="footer-contact-link">💬 WhatsApp Support</a>
+      </div>
+      <div class="footer-links">
+        <a href="./seller.html">Become a Seller</a>
+        <a href="./orders.html">Track Orders</a>
+        <a href="mailto:zulora.help@gmail.com">Report Issue</a>
+      </div>
+    </div>
+    <div class="footer-bottom">© 2026 Zulora AI. All Rights Reserved. | Hyperlocal Quick Commerce Platform</div>
+  </footer>
+
+  <!-- ═══════════════════════════════════════════════
+       SCRIPTS
+  ═══════════════════════════════════════════════ -->
+  <script type="module" src="./js/pwa.js"></script>
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

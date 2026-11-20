@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="azureGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284C7"/>
+      <stop offset="100%" stop-color="#0369A1"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#0284C7" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <rect width="100" height="100" rx="24" fill="url(#azureGrad)"/>
+  <path d="M 28 26 L 72 26 L 42 56 L 72 56 L 72 74 L 28 74 L 58 44 L 28 44 Z" fill="#FFFFFF" filter="url(#shadow)"/>
+  <circle cx="74" cy="26" r="6" fill="#38BDF8"/>
+</svg>
