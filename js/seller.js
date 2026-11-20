@@ -1,7 +1,6 @@
 /**
- * Zulora Local — Seller / Merchant Dashboard v2
- * Full dashboard: auth, product upload (multi-image), live orders, shop profile,
- * commission ledger, KPI stats, and demo fallback.
+ * Zulora Local — Seller / Merchant Dashboard v2 (Clean & Production-Ready)
+ * Real Firestore & Cloudinary data only — Zero fake/demo products or shops.
  */
 
 import {
@@ -15,16 +14,16 @@ import {
 import { uploadMultipleImages } from './cloudinary.js';
 import { getCurrentGpsPosition } from './geo-pricing.js';
 import { PLATFORM_CONSTANTS } from './config.js';
-import { showToast, addNotification } from './notifications.js';
+import { showToast } from './notifications.js';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentSeller = null;
-let currentShop   = null;
+let currentShop = null;
 let sellerProducts = [];
-let liveOrders     = [];
-let unsubscribeOrders   = null;
+let liveOrders = [];
+let unsubscribeOrders = null;
 let unsubscribeProducts = null;
-let selectedFiles       = [];   // FileList from multi-image input
+let selectedFiles = []; // Array of files from multi-image input
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -38,10 +37,10 @@ function setupEventListeners() {
   document.getElementById('btnSellerLogin')?.addEventListener('click', handleSellerLogin);
   document.getElementById('btnSellerLogout')?.addEventListener('click', handleSellerLogout);
 
-  // Shop status toggle
+  // Shop status toggle (Open / Closed)
   document.getElementById('shopStatusToggle')?.addEventListener('change', handleToggleShopStatus);
 
-  // GPS capture
+  // GPS capture for shop
   document.getElementById('btnCaptureShopGps')?.addEventListener('click', handleCaptureShopGps);
 
   // Shop profile form submit
@@ -59,7 +58,7 @@ function setupEventListeners() {
     if (val) val.textContent = e.target.value;
   });
 
-  // Category select: show/hide custom category input
+  // Category select: custom category option
   document.getElementById('productCategory')?.addEventListener('change', (e) => {
     const customGroup = document.getElementById('customCategoryGroup');
     const customInput = document.getElementById('customCategoryInput');
@@ -76,8 +75,7 @@ function setupEventListeners() {
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 function initAuth() {
   if (isConfigPlaceholder || !auth) {
-    // Demo mode — no real Firebase
-    loadDemoShop();
+    showAuthGate();
     return;
   }
   onAuthStateChanged(auth, (user) => {
@@ -87,6 +85,7 @@ function initAuth() {
       loadOrCreateShop(user);
     } else {
       currentSeller = null;
+      currentShop = null;
       showAuthGate();
     }
   });
@@ -94,28 +93,31 @@ function initAuth() {
 
 async function handleSellerLogin() {
   if (isConfigPlaceholder || !auth) {
-    loadDemoShop();
+    showToast('Firebase authentication is initializing or offline.', 'warning');
     return;
   }
   try {
     const result = await signInWithPopup(auth, googleProvider);
     currentSeller = result.user;
+    showToast('Signed in to Seller Mode!', 'success');
   } catch (err) {
-    console.error('[Seller] login error:', err);
-    showToast('Sign-in failed: ' + (err.message || 'Unknown error'), 'error');
+    if (err.code !== 'auth/popup-closed-by-user') {
+      showToast('Sign-in failed: ' + (err.message || 'Unknown error'), 'error');
+    }
   }
 }
 
 async function handleSellerLogout() {
   try {
-    if (unsubscribeOrders)   { unsubscribeOrders();   unsubscribeOrders   = null; }
+    if (unsubscribeOrders) { unsubscribeOrders(); unsubscribeOrders = null; }
     if (unsubscribeProducts) { unsubscribeProducts(); unsubscribeProducts = null; }
-    if (!isConfigPlaceholder && auth) await signOut(auth);
+    if (auth && !isConfigPlaceholder) await signOut(auth);
     currentSeller = null;
-    currentShop   = null;
+    currentShop = null;
     sellerProducts = [];
-    liveOrders     = [];
+    liveOrders = [];
     showAuthGate();
+    showToast('Logged out from Seller Mode.', 'info');
   } catch (err) {
     console.error('[Seller] logout error:', err);
   }
@@ -126,7 +128,8 @@ function showDashboard(user) {
   const dash = document.getElementById('dashboardSection');
   if (dash) { dash.style.display = 'block'; }
   document.getElementById('btnSellerLogout')?.classList.remove('hidden');
-  document.getElementById('sellerNameDisplay').textContent = user.displayName || user.email || 'Seller';
+  const nameEl = document.getElementById('sellerNameDisplay');
+  if (nameEl) nameEl.textContent = user.displayName || user.email || 'Seller';
 }
 
 function showAuthGate() {
@@ -136,728 +139,579 @@ function showAuthGate() {
   document.getElementById('btnSellerLogout')?.classList.add('hidden');
 }
 
-// ─── Shop load / create ───────────────────────────────────────────────────────
+// ─── Shop Profile ─────────────────────────────────────────────────────────────
 async function loadOrCreateShop(user) {
-  if (!db) return;
+  if (!db || isConfigPlaceholder) return;
   try {
     const shopRef = doc(db, 'shops', user.uid);
-    const snap    = await getDoc(shopRef);
+    const snap = await getDoc(shopRef);
+
     if (snap.exists()) {
       currentShop = { id: snap.id, ...snap.data() };
       populateShopForm(currentShop);
     } else {
-      // Create initial shop doc
+      // Create new initial shop document for this user
+      const rawHandle = (user.displayName || user.email.split('@')[0])
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, '_')
+        .slice(0, 20);
+
       const initial = {
-        ownerUid:        user.uid,
-        ownerName:       user.displayName || '',
-        ownerEmail:      user.email || '',
-        shopName:        (user.displayName || 'My Shop') + "'s Store",
-        handle:          '',
-        category:        '',
-        phone:           '',
-        upiId:           '',
-        deliveryRadiusKm: PLATFORM_CONSTANTS.DEFAULT_DELIVERY_RADIUS_KM,
-        description:     '',
-        lat:             null,
-        lng:             null,
-        isOpen:          false,
-        isVerified:      false,
+        ownerUid: user.uid,
+        ownerEmail: user.email || '',
+        name: user.displayName ? `${user.displayName}'s Shop` : 'Local Shop',
+        handle: `@${rawHandle}`,
+        phone: '',
+        upiId: '',
+        whatsapp: '',
+        category: 'Food',
+        deliveryRadiusKm: 5,
+        description: 'Quality local products delivered quickly.',
+        lat: null,
+        lng: null,
+        isOpen: true,
+        isVerified: false,
         customCategories: [],
-        createdAt:       serverTimestamp()
+        createdAt: serverTimestamp()
       };
       await setDoc(shopRef, initial);
       currentShop = { id: user.uid, ...initial };
-      showToast('Welcome! Your shop profile has been created 🎉', 'success');
+      populateShopForm(currentShop);
     }
+
+    // Listen to real products and live orders
     listenToSellerProducts(user.uid);
-    listenToSellerOrders(user.uid);
+    listenToSellerOrders(currentShop.id, user.uid);
   } catch (err) {
     console.error('[Seller] loadOrCreateShop error:', err);
-    showToast('Could not load shop: ' + err.message, 'error');
+    showToast('Error loading shop profile from Firestore: ' + err.message, 'error');
   }
 }
 
 function populateShopForm(shop) {
-  const set = (id, val) => {
+  if (!shop) return;
+  const setVal = (id, val) => {
     const el = document.getElementById(id);
-    if (el) el.value = val ?? '';
+    if (el && val != null) el.value = val;
   };
-  set('shopName',     shop.shopName     || '');
-  set('shopHandle',   shop.handle       || '');
-  set('shopCategory', shop.category     || '');
-  set('shopPhone',    shop.phone        || '');
-  set('shopUpiId',    shop.upiId        || '');
-  set('shopDescription', shop.description || '');
-  set('shopLat',      shop.lat          ?? '');
-  set('shopLng',      shop.lng          ?? '');
 
-  const radius = shop.deliveryRadiusKm || PLATFORM_CONSTANTS.DEFAULT_DELIVERY_RADIUS_KM;
-  const sliderEl = document.getElementById('shopDeliveryRadius');
-  if (sliderEl) sliderEl.value = radius;
-  const radVal = document.getElementById('shopRadiusVal');
-  if (radVal) radVal.textContent = radius;
+  setVal('shopName', shop.name || '');
+  setVal('shopHandle', shop.handle ? shop.handle.replace(/^@/, '') : '');
+  setVal('shopPhone', shop.phone || '');
+  setVal('shopUpiId', shop.upiId || '');
+  setVal('shopWhatsapp', shop.whatsapp || '');
+  setVal('shopDescription', shop.description || '');
+  setVal('shopDeliveryRadius', shop.deliveryRadiusKm || 5);
 
+  const radiusVal = document.getElementById('shopRadiusVal');
+  if (radiusVal) radiusVal.textContent = shop.deliveryRadiusKm || 5;
+
+  if (shop.category) {
+    const catEl = document.getElementById('shopCategory');
+    if (catEl) catEl.value = shop.category;
+  }
+
+  // GPS coords display
+  const coordsDisp = document.getElementById('shopCoordsDisplay');
+  if (coordsDisp) {
+    if (shop.lat != null && shop.lng != null) {
+      coordsDisp.textContent = `📍 Lat: ${shop.lat.toFixed(5)}, Lng: ${shop.lng.toFixed(5)}`;
+      coordsDisp.style.color = 'var(--emerald-600)';
+    } else {
+      coordsDisp.textContent = 'GPS not set yet. Click "Capture Shop GPS" below.';
+      coordsDisp.style.color = 'var(--slate-500)';
+    }
+  }
+
+  // Open/Closed Toggle
   const toggle = document.getElementById('shopStatusToggle');
-  const label  = document.getElementById('shopStatusLabel');
-  if (toggle) toggle.checked = !!shop.isOpen;
-  if (label) label.textContent = shop.isOpen ? 'Open ✅' : 'Closed ❌';
+  const label = document.getElementById('shopStatusLabel');
+  const isOpen = shop.isOpen !== false;
+  if (toggle) toggle.checked = isOpen;
+  if (label) {
+    label.textContent = isOpen ? '🟢 Shop Open' : '🔴 Shop Closed';
+    label.className = `shop-status-text ${isOpen ? 'status-open' : 'status-closed'}`;
+  }
 }
 
-// ─── Shop status toggle ───────────────────────────────────────────────────────
 async function handleToggleShopStatus(e) {
   const isOpen = e.target.checked;
-  const label  = document.getElementById('shopStatusLabel');
-  if (label) label.textContent = isOpen ? 'Open ✅' : 'Closed ❌';
-  showToast(`Your shop is now ${isOpen ? 'OPEN 🟢' : 'CLOSED 🔴'}`, isOpen ? 'success' : 'info');
+  const label = document.getElementById('shopStatusLabel');
+  if (label) {
+    label.textContent = isOpen ? '🟢 Shop Open' : '🔴 Shop Closed';
+    label.className = `shop-status-text ${isOpen ? 'status-open' : 'status-closed'}`;
+  }
+  if (!currentShop || !db || isConfigPlaceholder) return;
 
-  if (!db || !currentShop) return;
   try {
     await updateDoc(doc(db, 'shops', currentShop.id), { isOpen, updatedAt: serverTimestamp() });
-    if (currentShop) currentShop.isOpen = isOpen;
+    currentShop.isOpen = isOpen;
+    showToast(isOpen ? 'Shop is now OPEN for orders!' : 'Shop marked as CLOSED.', isOpen ? 'success' : 'info');
   } catch (err) {
-    console.error('[Seller] toggle status error:', err);
-    // revert UI
-    e.target.checked = !isOpen;
-    if (label) label.textContent = !isOpen ? 'Open ✅' : 'Closed ❌';
-    showToast('Could not update shop status', 'error');
+    showToast('Failed to update shop status: ' + err.message, 'error');
   }
 }
 
-// ─── GPS Capture ──────────────────────────────────────────────────────────────
 async function handleCaptureShopGps() {
-  showToast('Detecting your GPS location…', 'info');
+  const btn = document.getElementById('btnCaptureShopGps');
+  const disp = document.getElementById('shopCoordsDisplay');
+  if (btn) btn.textContent = '⏳ Capturing GPS…';
+
   try {
     const pos = await getCurrentGpsPosition();
-    document.getElementById('shopLat').value = pos.lat.toFixed(6);
-    document.getElementById('shopLng').value = pos.lng.toFixed(6);
-    showToast(`📍 GPS captured: ${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}`, 'success');
+    if (disp) {
+      disp.textContent = `📍 Lat: ${pos.lat.toFixed(5)}, Lng: ${pos.lng.toFixed(5)} (±${Math.round(pos.accuracy || 0)}m)`;
+      disp.style.color = 'var(--emerald-600)';
+    }
+    if (currentShop) {
+      currentShop.lat = pos.lat;
+      currentShop.lng = pos.lng;
+    }
+    showToast('Shop GPS coordinates captured! Save your profile to apply.', 'success');
   } catch (err) {
-    showToast('Could not get GPS: ' + err.message, 'error');
+    showToast(err.message || 'Could not capture GPS location.', 'error');
+  } finally {
+    if (btn) btn.textContent = '🛰️ Capture Shop GPS';
   }
 }
 
-// ─── Save Shop Profile ────────────────────────────────────────────────────────
 async function handleSaveShopProfile(e) {
   e.preventDefault();
-  const handle = document.getElementById('shopHandle')?.value.trim();
-  if (handle && !/^[a-z0-9_]{3,30}$/.test(handle)) {
-    showToast('Handle must be 3–30 lowercase letters, digits, or underscores.', 'error');
+  if (!currentShop || !db || isConfigPlaceholder) {
+    showToast('Please sign in first.', 'warning');
     return;
   }
 
+  const name = document.getElementById('shopName')?.value.trim();
+  const rawHandle = document.getElementById('shopHandle')?.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  const phone = document.getElementById('shopPhone')?.value.trim();
+  const upiId = document.getElementById('shopUpiId')?.value.trim();
+  const whatsapp = document.getElementById('shopWhatsapp')?.value.trim();
+  const category = document.getElementById('shopCategory')?.value;
+  const description = document.getElementById('shopDescription')?.value.trim();
+  const radius = parseFloat(document.getElementById('shopDeliveryRadius')?.value || '5');
+
+  if (!name) { showToast('Please enter a shop name.', 'warning'); return; }
+  if (!rawHandle) { showToast('Please enter a unique shop handle.', 'warning'); return; }
+
+  const handle = `@${rawHandle}`;
   const payload = {
-    shopName:         document.getElementById('shopName')?.value.trim() || '',
-    handle:           handle,
-    category:         document.getElementById('shopCategory')?.value || '',
-    phone:            document.getElementById('shopPhone')?.value.trim() || '',
-    upiId:            document.getElementById('shopUpiId')?.value.trim() || '',
-    description:      document.getElementById('shopDescription')?.value.trim() || '',
-    deliveryRadiusKm: parseFloat(document.getElementById('shopDeliveryRadius')?.value) || 5,
-    lat:              parseFloat(document.getElementById('shopLat')?.value) || null,
-    lng:              parseFloat(document.getElementById('shopLng')?.value) || null,
-    updatedAt:        serverTimestamp()
+    name,
+    handle,
+    phone,
+    upiId,
+    whatsapp,
+    category,
+    description,
+    deliveryRadiusKm: radius,
+    updatedAt: serverTimestamp()
   };
 
-  if (!db || !currentShop) {
-    // Demo mode
-    Object.assign(currentShop, payload);
-    showToast('Shop profile saved (demo mode)!', 'success');
-    return;
-  }
+  if (currentShop.lat != null) payload.lat = currentShop.lat;
+  if (currentShop.lng != null) payload.lng = currentShop.lng;
+
+  const btn = e.target.querySelector('button[type="submit"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Saving…'; }
 
   try {
     await updateDoc(doc(db, 'shops', currentShop.id), payload);
     Object.assign(currentShop, payload);
-    showToast('✅ Shop profile saved successfully!', 'success');
+    showToast('Shop profile saved successfully!', 'success');
   } catch (err) {
-    console.error('[Seller] save profile error:', err);
-    showToast('Could not save profile: ' + err.message, 'error');
+    showToast('Save failed: ' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '💾 Save Shop Profile'; }
   }
 }
 
-// ─── Multi-Image Select ───────────────────────────────────────────────────────
+// ─── Multi-Image Select & Preview ─────────────────────────────────────────────
 function handleMultiImageSelect(e) {
-  const files = Array.from(e.target.files);
-  selectedFiles = files;
-
-  const grid = document.getElementById('imagePreviewGrid');
-  if (grid) grid.innerHTML = '';
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
 
   if (files.length > 6) {
-    showToast('⚠️ Max 6 images allowed. Only the first 6 will be used.', 'warning');
+    showToast('Maximum 6 images allowed per product.', 'warning');
     selectedFiles = files.slice(0, 6);
+  } else {
+    selectedFiles = files;
   }
+
+  const grid = document.getElementById('imagePreviewGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
 
   selectedFiles.forEach((file, idx) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const img = document.createElement('img');
-      img.src   = ev.target.result;
-      img.className = 'preview-thumb';
-      img.title     = file.name;
-      img.alt       = `Preview ${idx + 1}`;
-      grid?.appendChild(img);
+      const item = document.createElement('div');
+      item.className = 'img-preview-item';
+      item.style.position = 'relative';
+      item.style.aspectRatio = '4/3';
+      item.style.borderRadius = 'var(--radius-md)';
+      item.style.overflow = 'hidden';
+      item.style.border = '1px solid var(--slate-200)';
+      item.innerHTML = `
+        <img src="${ev.target.result}" alt="Preview ${idx + 1}" style="width:100%;height:100%;object-fit:cover;" />
+        <span style="position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;">
+          ${idx === 0 ? 'Cover' : `#${idx + 1}`}
+        </span>
+        <div id="prog-${idx}" style="position:absolute;bottom:0;left:0;right:0;height:4px;background:var(--emerald-500);width:0%;transition:width 0.2s;"></div>
+      `;
+      grid.appendChild(item);
     };
     reader.readAsDataURL(file);
   });
 }
 
-// ─── Upload Product ───────────────────────────────────────────────────────────
+// ─── Product Upload ───────────────────────────────────────────────────────────
 async function handleUploadProduct(e) {
   e.preventDefault();
-  const btn = document.getElementById('btnSubmitProduct');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Uploading…'; }
+  if (!currentSeller) {
+    showToast('Please sign in to upload products.', 'warning');
+    return;
+  }
 
-  try {
-    // Gather form values
-    const title    = document.getElementById('productTitle')?.value.trim();
-    const catSelect = document.getElementById('productCategory')?.value;
-    const customCat = document.getElementById('customCategoryInput')?.value.trim();
-    const category  = (catSelect === 'add_custom' ? customCat : catSelect) || 'General';
-    const price    = parseFloat(document.getElementById('productPrice')?.value) || 0;
-    const mrp      = parseFloat(document.getElementById('productMrp')?.value) || 0;
-    const unit     = document.getElementById('productUnit')?.value.trim() || '';
-    const weightKg = parseFloat(document.getElementById('productWeightKg')?.value) || 0;
-    const stock    = parseInt(document.getElementById('productStock')?.value, 10) || 0;
+  const title = document.getElementById('productTitle')?.value.trim();
+  let category = document.getElementById('productCategory')?.value;
+  const customCat = document.getElementById('customCategoryInput')?.value.trim();
+  const price = parseFloat(document.getElementById('productPrice')?.value);
+  const mrp = parseFloat(document.getElementById('productMrp')?.value) || null;
+  const unit = document.getElementById('productUnit')?.value.trim();
+  const weight = parseFloat(document.getElementById('productWeight')?.value) || 0.5;
+  const stock = parseInt(document.getElementById('productStock')?.value, 10) || 0;
+  const inStock = document.getElementById('productInStock')?.checked ?? true;
 
-    if (!title) { showToast('Product title is required.', 'error'); return; }
+  if (!title) { showToast('Please enter a product title.', 'warning'); return; }
+  if (isNaN(price) || price <= 0) { showToast('Please enter a valid selling price.', 'warning'); return; }
 
-    // Save custom category to shop
-    if (catSelect === 'add_custom' && customCat && db && currentShop) {
+  // Custom category handling
+  if (category === 'add_custom') {
+    if (!customCat) { showToast('Please type your custom category name.', 'warning'); return; }
+    category = customCat;
+    if (db && currentShop && !isConfigPlaceholder) {
       try {
         await updateDoc(doc(db, 'shops', currentShop.id), {
           customCategories: arrayUnion(customCat)
         });
-        if (!currentShop.customCategories) currentShop.customCategories = [];
-        if (!currentShop.customCategories.includes(customCat)) {
-          currentShop.customCategories.push(customCat);
-        }
-      } catch (_) { /* non-fatal */ }
+      } catch (err) {}
     }
+  }
 
-    // Upload images
-    let imageUrl = 'https://placehold.co/400x300?text=No+Image';
-    let images   = [];
+  if (selectedFiles.length === 0) {
+    showToast('Please select at least 1 image for the product.', 'warning');
+    return;
+  }
 
-    if (selectedFiles.length > 0) {
-      showToast('📤 Uploading images…', 'info');
-      const results = await uploadMultipleImages(
-        selectedFiles.slice(0, 6),
-        (fileIdx, pct) => updateProgressBar(fileIdx, pct)
-      );
-      imageUrl = results[0]?.url || imageUrl;
-      images   = results.map(r => r.url);
-    }
+  const submitBtn = document.getElementById('btnSubmitProduct');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '⏳ Uploading to Cloudinary…'; }
 
-    // Build product payload
+  try {
+    // Upload all selected images simultaneously to Cloudinary
+    const uploadResults = await uploadMultipleImages(selectedFiles, (fileIdx, pct) => {
+      const bar = document.getElementById(`prog-${fileIdx}`);
+      if (bar) bar.style.width = `${pct}%`;
+    });
+
+    const imageUrls = uploadResults.map(r => r.url);
+    const coverUrl = imageUrls[0];
+
     const productPayload = {
-      shopId:    currentShop?.id || 'demo_shop',
-      sellerUid: currentSeller?.uid || 'demo_uid',
+      shopId: currentShop?.id || currentSeller.uid,
+      sellerUid: currentSeller.uid,
+      shopName: currentShop?.name || 'Local Seller',
       title,
       category,
       price,
       mrp,
       unit,
-      weightKg,
-      stock,
-      inStock:   stock > 0,
-      imageUrl,
-      images,
+      weightKg: weight,
+      stock: inStock ? stock : 0,
+      inStock: inStock && stock > 0,
+      imageUrl: coverUrl,
+      images: imageUrls,
       salesCount: 0,
-      createdAt:  serverTimestamp ? serverTimestamp() : new Date().toISOString()
+      createdAt: serverTimestamp()
     };
 
     if (db && !isConfigPlaceholder) {
       await addDoc(collection(db, 'products'), productPayload);
-    } else {
-      // Demo: store in localStorage
-      const demoProds = JSON.parse(localStorage.getItem('zulora_demo_products') || '[]');
-      demoProds.unshift({ id: 'demo_' + Date.now(), ...productPayload, createdAt: new Date().toISOString() });
-      localStorage.setItem('zulora_demo_products', JSON.stringify(demoProds));
-      sellerProducts = demoProds;
-      renderSellerProducts();
-      updateDashboardStats();
     }
 
-    showToast('✅ Product uploaded successfully!', 'success');
-    addNotification(`New product listed: "${title}"`, 'success');
+    showToast(`✓ "${title}" uploaded to Cloudinary & saved!`, 'success');
 
-    // Reset form
+    // Reset upload form
     document.getElementById('productUploadForm')?.reset();
+    selectedFiles = [];
     const grid = document.getElementById('imagePreviewGrid');
     if (grid) grid.innerHTML = '';
-    const prog = document.getElementById('multiUploadProgress');
-    if (prog) prog.innerHTML = '';
-    selectedFiles = [];
-    document.getElementById('customCategoryGroup')?.classList.add('hidden');
-
+    const customGroup = document.getElementById('customCategoryGroup');
+    if (customGroup) customGroup.classList.add('hidden');
   } catch (err) {
-    console.error('[Seller] upload product error:', err);
-    showToast('Upload failed: ' + err.message, 'error');
+    console.error('[Seller] Upload error:', err);
+    showToast('Upload failed: ' + (err.message || 'Unknown error'), 'error');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '➕ Upload Product to Store'; }
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '🚀 Publish Product'; }
   }
 }
 
-// ─── Progress Bars ─────────────────────────────────────────────────────────────
-function updateProgressBar(fileIdx, pct) {
-  const container = document.getElementById('multiUploadProgress');
-  if (!container) return;
-
-  let wrap = document.getElementById(`prog-wrap-${fileIdx}`);
-  if (!wrap) {
-    wrap = document.createElement('div');
-    wrap.className = 'progress-bar-wrap';
-    wrap.id        = `prog-wrap-${fileIdx}`;
-    wrap.innerHTML = `
-      <span class="progress-bar-label">File ${fileIdx + 1}</span>
-      <div class="progress-bar-track">
-        <div class="progress-bar-fill" id="prog-${fileIdx}" style="width:0%"></div>
-      </div>
-      <span style="font-size:.78rem;color:var(--slate-600);min-width:36px;" id="prog-pct-${fileIdx}">0%</span>
-    `;
-    container.appendChild(wrap);
-  }
-
-  const fill = document.getElementById(`prog-${fileIdx}`);
-  const pctEl = document.getElementById(`prog-pct-${fileIdx}`);
-  if (fill)  fill.style.width = pct + '%';
-  if (pctEl) pctEl.textContent = pct + '%';
-
-  if (pct >= 100) {
-    setTimeout(() => wrap?.remove(), 800);
-  }
-}
-
-// ─── Live Products Listener ────────────────────────────────────────────────────
-function listenToSellerProducts(uid) {
-  if (!db || !uid) return;
+// ─── Real Products Listener ───────────────────────────────────────────────────
+function listenToSellerProducts(sellerUid) {
   if (unsubscribeProducts) unsubscribeProducts();
+  if (!db || isConfigPlaceholder) return;
 
   const q = query(
     collection(db, 'products'),
-    where('sellerUid', '==', uid),
+    where('sellerUid', '==', sellerUid),
     orderBy('createdAt', 'desc')
   );
 
-  unsubscribeProducts = onSnapshot(q, (snap) => {
-    sellerProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  unsubscribeProducts = onSnapshot(q, (snapshot) => {
+    sellerProducts = [];
+    snapshot.forEach((d) => {
+      sellerProducts.push({ id: d.id, ...d.data() });
+    });
     renderSellerProducts();
     updateDashboardStats();
   }, (err) => {
-    console.error('[Seller] products listener error:', err);
+    console.error('[Seller] Products onSnapshot error:', err);
   });
 }
 
-// ─── Live Orders Listener ─────────────────────────────────────────────────────
-function listenToSellerOrders(uid) {
-  if (!db || !uid) return;
-  if (unsubscribeOrders) unsubscribeOrders();
-
-  const q = query(
-    collection(db, 'orders'),
-    where('sellerUid', '==', uid),
-    orderBy('createdAt', 'desc')
-  );
-
-  unsubscribeOrders = onSnapshot(q, (snap) => {
-    liveOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderSellerOrders();
-    updateDashboardStats();
-  }, (err) => {
-    console.error('[Seller] orders listener error:', err);
-  });
-}
-
-// ─── Render Products Table ─────────────────────────────────────────────────────
 function renderSellerProducts() {
   const tbody = document.getElementById('productsTableBody');
   if (!tbody) return;
 
   if (sellerProducts.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">
-      <div class="empty-icon">📦</div>
-      <p>No products yet — upload your first product above!</p>
-    </td></tr>`;
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center;padding:2.5rem 1rem;color:var(--slate-500);">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">📦</div>
+          <p style="font-weight:600;font-size:0.95rem;margin-bottom:0.25rem;">No products uploaded yet.</p>
+          <p style="font-size:0.8rem;">Use the form above to upload your first product with images to Cloudinary!</p>
+        </td>
+      </tr>
+    `;
     return;
   }
 
   tbody.innerHTML = sellerProducts.map(p => {
-    const imgBadge = (p.images && p.images.length > 1)
-      ? `<span class="img-count-badge">+${p.images.length}</span>` : '';
-    const statusClass = p.inStock ? 'instock' : 'outstock';
-    const statusLabel = p.inStock ? '✅ In Stock' : '❌ Out';
-    const nextInStock  = !p.inStock;
-    const age = p.createdAt ? calculateProductAge(p.createdAt) : '—';
+    const cover = (p.images && p.images[0]) || p.imageUrl || 'https://via.placeholder.com/80x60?text=No+Img';
+    const age = calculateProductAge(p.createdAt);
+    const inStock = Boolean(p.inStock && p.stock > 0);
 
-    return `<tr>
-      <td>
-        <div style="display:flex;align-items:center;gap:.6rem;">
-          <img class="product-thumb" src="${escapeHtml(p.imageUrl || 'https://placehold.co/80x80?text=N/A')}" alt="${escapeHtml(p.title)}" />
-          <div>
-            <div class="product-name">${escapeHtml(p.title)}${imgBadge}</div>
-            <div class="product-cat">${escapeHtml(p.category || '—')}</div>
+    return `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:0.75rem;">
+            <img src="${escapeHtml(cover)}" alt="${escapeHtml(p.title)}" style="width:48px;height:36px;object-fit:cover;border-radius:var(--radius-sm);border:1px solid var(--slate-200);flex-shrink:0;" />
+            <div>
+              <div style="font-weight:700;color:var(--slate-900);font-size:0.85rem;">${escapeHtml(p.title)}</div>
+              <div style="font-size:0.72rem;color:var(--slate-400);">${age}</div>
+            </div>
           </div>
-        </div>
-      </td>
-      <td>
-        <strong>₹${(p.price || 0).toFixed(2)}</strong>
-        ${p.mrp && p.mrp > p.price ? `<br/><small style="color:var(--slate-400);text-decoration:line-through;">₹${(p.mrp).toFixed(2)}</small>` : ''}
-      </td>
-      <td>
-        <div class="stock-ctrl">
-          <button onclick="window.updateStock('${p.id}', -1)" aria-label="Decrease stock">−</button>
-          <span class="stock-num">${p.stock ?? 0}</span>
-          <button onclick="window.updateStock('${p.id}', 1)" aria-label="Increase stock">+</button>
-        </div>
-      </td>
-      <td>
-        <span class="status-pill ${statusClass}" onclick="window.toggleProductStockState('${p.id}', ${nextInStock})" title="Click to toggle">
-          ${statusLabel}
-        </span>
-      </td>
-      <td style="font-size:.8rem;color:var(--slate-500);">${age}</td>
-      <td style="font-weight:700;color:var(--azure-700);">${p.salesCount || 0}</td>
-      <td>
-        <button class="btn-danger" onclick="window.deleteProductItem('${p.id}')">🗑️ Delete</button>
-      </td>
-    </tr>`;
+        </td>
+        <td><span class="badge" style="background:var(--slate-100);font-size:0.75rem;">${escapeHtml(p.category)}</span></td>
+        <td><strong>₹${p.price}</strong> ${p.mrp ? `<span style="font-size:0.72rem;color:var(--slate-400);text-decoration:line-through;">₹${p.mrp}</span>` : ''}</td>
+        <td>
+          <span style="font-weight:700;color:${p.stock <= 5 ? 'var(--rose-600)' : 'var(--slate-800)'};">${p.stock}</span>
+          <span style="font-size:0.72rem;color:var(--slate-400);">(${escapeHtml(p.unit || 'pcs')})</span>
+        </td>
+        <td>
+          <button class="btn btn-sm ${inStock ? 'btn-success' : 'btn-ghost'}" onclick="window.toggleProductStockState('${escapeHtml(p.id)}', ${inStock})" style="font-size:0.72rem;padding:0.25rem 0.5rem;">
+            ${inStock ? '🟢 In Stock' : '🔴 Out of Stock'}
+          </button>
+        </td>
+        <td style="font-size:0.82rem;font-weight:600;">${p.salesCount || 0} sold</td>
+        <td>
+          <div style="display:flex;gap:0.35rem;">
+            <button class="btn btn-icon btn-sm" onclick="window.updateStock('${escapeHtml(p.id)}', ${p.stock})" title="Edit Stock">✏️</button>
+            <button class="btn btn-icon btn-sm btn-danger" onclick="window.deleteProductItem('${escapeHtml(p.id)}')" title="Delete Product">🗑️</button>
+          </div>
+        </td>
+      </tr>
+    `;
   }).join('');
 }
 
-// ─── Stock Update ─────────────────────────────────────────────────────────────
-window.updateStock = async function(prodId, delta) {
-  const idx = sellerProducts.findIndex(p => p.id === prodId);
-  if (idx === -1) return;
-  const newStock = Math.max(0, (sellerProducts[idx].stock || 0) + delta);
-  sellerProducts[idx].stock  = newStock;
-  sellerProducts[idx].inStock = newStock > 0;
-  renderSellerProducts();
-
-  if (db && !isConfigPlaceholder) {
-    try {
-      await updateDoc(doc(db, 'products', prodId), {
-        stock: newStock,
-        inStock: newStock > 0,
-        updatedAt: serverTimestamp()
-      });
-    } catch (err) {
-      console.error('[Seller] updateStock error:', err);
-      showToast('Could not update stock', 'error');
-    }
-  } else {
-    // Demo: persist
-    const demoProds = JSON.parse(localStorage.getItem('zulora_demo_products') || '[]');
-    const di = demoProds.findIndex(p => p.id === prodId);
-    if (di !== -1) { demoProds[di].stock = newStock; demoProds[di].inStock = newStock > 0; }
-    localStorage.setItem('zulora_demo_products', JSON.stringify(demoProds));
+window.toggleProductStockState = async function(prodId, currentInStock) {
+  if (!db || isConfigPlaceholder) return;
+  const newInStock = !currentInStock;
+  try {
+    await updateDoc(doc(db, 'products', prodId), {
+      inStock: newInStock,
+      stock: newInStock ? 10 : 0
+    });
+    showToast(`Product is now ${newInStock ? 'In Stock' : 'Out of Stock'}.`, 'info');
+  } catch (err) {
+    showToast('Failed to update stock: ' + err.message, 'error');
   }
 };
 
-// ─── Toggle Product In/Out of Stock ──────────────────────────────────────────
-window.toggleProductStockState = async function(prodId, targetInStock) {
-  const idx = sellerProducts.findIndex(p => p.id === prodId);
-  if (idx !== -1) {
-    sellerProducts[idx].inStock = targetInStock;
-    renderSellerProducts();
-  }
+window.updateStock = async function(prodId, currentStock) {
+  const entered = prompt('Enter new stock count:', currentStock);
+  if (entered == null) return;
+  const num = parseInt(entered, 10);
+  if (isNaN(num) || num < 0) { showToast('Invalid stock number.', 'warning'); return; }
+
   if (!db || isConfigPlaceholder) return;
   try {
     await updateDoc(doc(db, 'products', prodId), {
-      inStock: targetInStock,
-      updatedAt: serverTimestamp()
+      stock: num,
+      inStock: num > 0
     });
+    showToast(`Stock updated to ${num}`, 'success');
   } catch (err) {
-    console.error('[Seller] toggleProductStockState error:', err);
-    showToast('Could not update status', 'error');
+    showToast('Failed: ' + err.message, 'error');
   }
 };
 
-// ─── Delete Product ───────────────────────────────────────────────────────────
 window.deleteProductItem = async function(prodId) {
-  if (!confirm('Delete this product? This action cannot be undone.')) return;
-  if (db && !isConfigPlaceholder) {
-    try {
-      await deleteDoc(doc(db, 'products', prodId));
-    } catch (err) {
-      console.error('[Seller] deleteProductItem error:', err);
-      showToast('Could not delete product', 'error');
-      return;
-    }
-  } else {
-    let demoProds = JSON.parse(localStorage.getItem('zulora_demo_products') || '[]');
-    demoProds = demoProds.filter(p => p.id !== prodId);
-    localStorage.setItem('zulora_demo_products', JSON.stringify(demoProds));
-    sellerProducts = sellerProducts.filter(p => p.id !== prodId);
-    renderSellerProducts();
-    updateDashboardStats();
+  if (!confirm('Are you sure you want to delete this product?')) return;
+  if (!db || isConfigPlaceholder) return;
+  try {
+    await deleteDoc(doc(db, 'products', prodId));
+    showToast('Product deleted.', 'info');
+  } catch (err) {
+    showToast('Delete failed: ' + err.message, 'error');
   }
-  showToast('Product deleted.', 'info');
 };
 
-// ─── Render Orders ─────────────────────────────────────────────────────────────
+// ─── Real Live Orders Listener ────────────────────────────────────────────────
+function listenToSellerOrders(shopId, sellerUid) {
+  if (unsubscribeOrders) unsubscribeOrders();
+  if (!db || isConfigPlaceholder) return;
+
+  const q = query(
+    collection(db, 'orders'),
+    where('shopId', '==', shopId),
+    orderBy('createdAt', 'desc')
+  );
+
+  unsubscribeOrders = onSnapshot(q, (snapshot) => {
+    liveOrders = [];
+    snapshot.forEach(d => {
+      liveOrders.push({ id: d.id, ...d.data() });
+    });
+    renderSellerOrders();
+    updateDashboardStats();
+  }, (err) => {
+    console.error('[Seller] Orders onSnapshot error:', err);
+  });
+}
+
 function renderSellerOrders() {
-  const container = document.getElementById('liveOrdersContainer');
+  const container = document.getElementById('sellerOrdersContainer');
   if (!container) return;
 
   if (liveOrders.length === 0) {
-    container.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">🛵</div>
-      <p>No orders yet. When buyers place orders from your shop, they'll appear here in real time.</p>
-    </div>`;
+    container.innerHTML = `
+      <div style="text-align:center;padding:3rem 1rem;background:var(--glass-bg);border-radius:var(--radius-lg);border:1px dashed var(--slate-300);">
+        <div style="font-size:2.5rem;margin-bottom:0.5rem;">📦</div>
+        <h4 style="font-size:1.05rem;color:var(--slate-800);margin-bottom:0.25rem;">No Incoming Orders Yet</h4>
+        <p style="font-size:0.85rem;color:var(--slate-500);">New customer orders will appear here in real-time with 1-tap call & WhatsApp confirmation buttons.</p>
+      </div>
+    `;
     return;
   }
 
-  const shopName = currentShop?.shopName || 'our shop';
-
   container.innerHTML = liveOrders.map(order => {
-    const phone    = escapeHtml(order.buyerPhone || '');
-    const buyer    = escapeHtml(order.buyerName  || 'Buyer');
-    const address  = escapeHtml(order.deliveryAddress || order.address || 'No address provided');
-    const total    = (order.grandTotal || order.total || 0).toFixed(2);
-    const status   = order.orderStatus || 'Placed';
-    const orderId  = order.id.slice(-6).toUpperCase();
-    const mapLat   = order.buyerLat || '';
-    const mapLng   = order.buyerLng || '';
-    const mapHref  = (mapLat && mapLng)
-      ? `https://www.google.com/maps/dir/?api=1&destination=${mapLat},${mapLng}`
-      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-    const waMsg = encodeURIComponent(
-      `Thank you for your order #${orderId} from ${shopName}! Your order is now ${status}. We appreciate your support!`
-    );
+    const status = order.orderStatus || 'Placed';
+    const cleanPhone = (order.buyerPhone || '').replace(/[^0-9]/g, '');
+    const callUrl = `tel:+91${cleanPhone}`;
+    const waUrl = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(`Hi ${order.buyerName}, your Zulora order #${order.orderId || order.id} is confirmed!`)}`;
 
-    const statusSteps = ['Placed', 'Accepted & Packing', 'Out for Delivery', 'Delivered'];
-    const statusBtns = statusSteps.map(s => {
-      const isActive = s === status;
-      return `<button class="order-status-btn${isActive ? ' active' : ''}"
-        onclick="window.updateOrderStatus('${order.id}', '${escapeHtml(s)}')">${s}</button>`;
-    }).join('');
-
-    const itemsHtml = Array.isArray(order.items)
-      ? order.items.map(it =>
-          `<div class="order-item-row">• ${escapeHtml(it.title || 'Item')} × ${it.qty || 1} — ₹${((it.price || 0) * (it.qty || 1)).toFixed(2)}</div>`
-        ).join('')
-      : '<div class="order-item-row">Order details not available</div>';
-
-    const timeStr = order.createdAt?.toDate
-      ? order.createdAt.toDate().toLocaleString('en-IN')
-      : (order.createdAt ? new Date(order.createdAt).toLocaleString('en-IN') : 'Unknown time');
-
-    return `<div class="order-card" id="order-card-${order.id}">
-      <div class="order-header">
-        <div>
-          <span class="order-id">Order #${orderId}</span>
-          <span style="margin-left:.6rem;padding:2px 10px;border-radius:9999px;font-size:.75rem;font-weight:700;
-            background:${statusColorBg(status)};color:${statusColorText(status)};">${status}</span>
+    return `
+      <div class="glass-card" style="padding:1.25rem;margin-bottom:1rem;border-left:4px solid var(--azure-600);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+          <div>
+            <div style="font-size:1.1rem;font-weight:800;color:var(--slate-900);">Order #${escapeHtml(order.orderId || order.id)}</div>
+            <div style="font-size:0.8rem;color:var(--slate-500);">Buyer: <strong>${escapeHtml(order.buyerName)}</strong> (${escapeHtml(order.buyerPhone)})</div>
+            <div style="font-size:0.8rem;color:var(--slate-500);">📍 ${escapeHtml(order.buyerAddress)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:1.25rem;font-weight:800;color:var(--emerald-600);">₹${order.totalAmount || order.grandTotal || 0}</div>
+            <span class="badge" style="background:var(--azure-100);color:var(--azure-800);font-size:0.75rem;">${escapeHtml(status)}</span>
+          </div>
         </div>
-        <span class="order-time">${timeStr}</span>
+
+        <!-- Ordered Items list -->
+        <div style="background:var(--slate-50);padding:0.6rem 0.85rem;border-radius:var(--radius-md);margin-bottom:0.75rem;font-size:0.82rem;">
+          ${(order.items || []).map(i => `<div>• ${escapeHtml(i.title)} × ${i.qty || i.quantity} (₹${(i.price || 0) * (i.qty || i.quantity)})</div>`).join('')}
+        </div>
+
+        <!-- 4-step status updater -->
+        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;margin-bottom:0.75rem;">
+          <span style="font-size:0.78rem;font-weight:700;color:var(--slate-600);">Update Status:</span>
+          ${['Placed', 'Accepted & Packing', 'Out for Delivery', 'Delivered'].map(s => `
+            <button class="btn btn-sm ${status === s ? 'btn-primary' : 'btn-ghost'}" onclick="window.updateOrderStatus('${escapeHtml(order.id)}', '${s}')" style="font-size:0.72rem;padding:0.25rem 0.5rem;">
+              ${s}
+            </button>
+          `).join('')}
+        </div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+          <a href="${callUrl}" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:0.3rem;">
+            📞 Call Buyer
+          </a>
+          <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="display:inline-flex;align-items:center;gap:0.3rem;">
+            💬 WhatsApp Confirmation
+          </a>
+        </div>
       </div>
-
-      <div class="order-buyer">👤 ${buyer}</div>
-      <div class="order-address">📍 ${address}</div>
-
-      <div class="order-contact-btns">
-        ${phone ? `<a href="tel:+91${phone}" class="btn-call">📞 Call Buyer</a>` : ''}
-        ${phone ? `<a href="https://wa.me/91${phone}?text=${waMsg}" target="_blank" rel="noopener" class="btn-whatsapp">💬 WhatsApp</a>` : ''}
-        <a href="${mapHref}" target="_blank" rel="noopener" class="btn-maps">🗺️ Open Map</a>
-      </div>
-
-      <div class="order-items-list">${itemsHtml}</div>
-      <div class="order-total">Grand Total: ₹${total}
-        ${order.paymentMethod ? `<span style="font-size:.8rem;color:var(--slate-500);margin-left:.5rem;">(${escapeHtml(order.paymentMethod)})</span>` : ''}
-      </div>
-
-      <div class="order-actions">${statusBtns}</div>
-    </div>`;
+    `;
   }).join('');
 }
 
-function statusColorBg(status) {
-  const m = {
-    'Placed':              '#FEF3C7',
-    'Accepted & Packing':  '#E0F2FE',
-    'Out for Delivery':    '#D1FAE5',
-    'Delivered':           '#D1FAE5'
-  };
-  return m[status] || '#F1F5F9';
-}
-function statusColorText(status) {
-  const m = {
-    'Placed':              '#B45309',
-    'Accepted & Packing':  '#0369A1',
-    'Out for Delivery':    '#059669',
-    'Delivered':           '#059669'
-  };
-  return m[status] || '#475569';
-}
-
-// ─── Update Order Status ───────────────────────────────────────────────────────
 window.updateOrderStatus = async function(orderDocId, newStatus) {
-  // Update local state immediately for responsiveness
-  const idx = liveOrders.findIndex(o => o.id === orderDocId);
-  if (idx !== -1) {
-    liveOrders[idx].orderStatus = newStatus;
-    renderSellerOrders();
-  }
-
-  const shortId = orderDocId.slice(-6).toUpperCase();
-  addNotification(`Order #${shortId} → ${newStatus}`, 'info');
-
   if (!db || isConfigPlaceholder) return;
   try {
     await updateDoc(doc(db, 'orders', orderDocId), {
       orderStatus: newStatus,
-      updatedAt:   serverTimestamp()
+      statusUpdatedAt: serverTimestamp()
     });
+    showToast(`Order status updated to: ${newStatus}`, 'success');
   } catch (err) {
-    console.error('[Seller] updateOrderStatus error:', err);
-    showToast('Could not update order status', 'error');
+    showToast('Failed to update status: ' + err.message, 'error');
   }
 };
 
-// ─── KPI Stats ─────────────────────────────────────────────────────────────────
+// ─── Dashboard Stats & Commission ─────────────────────────────────────────────
 function updateDashboardStats() {
-  const deliveredOrders = liveOrders.filter(o => o.orderStatus === 'Delivered');
-  const gmv = deliveredOrders.reduce((sum, o) => sum + (o.grandTotal || o.total || 0), 0);
-  const commission = gmv * PLATFORM_CONSTANTS.PLATFORM_COMMISSION_RATE;
-  const activeProducts = sellerProducts.filter(p => p.inStock).length;
+  const totalSales = liveOrders.reduce((sum, o) => sum + (o.totalAmount || o.grandTotal || 0), 0);
+  const totalOrders = liveOrders.length;
+  const activeProducts = sellerProducts.filter(p => p.inStock && p.stock > 0).length;
+  const commission = Math.round(totalSales * PLATFORM_CONSTANTS.PLATFORM_COMMISSION_RATE);
 
-  const set = (id, val) => {
+  const setEl = (id, val) => {
     const el = document.getElementById(id);
     if (el) el.textContent = val;
   };
 
-  set('statTotalSales',     `₹${gmv.toFixed(2)}`);
-  set('statTotalOrders',    liveOrders.length);
-  set('statActiveProducts', activeProducts);
-  set('statCommissionOwed', `₹${commission.toFixed(2)}`);
-
-  // Commission ledger
-  set('ledgerDeliveredCount', deliveredOrders.length);
-  set('ledgerGmv',            `₹${gmv.toFixed(2)}`);
-  set('ledgerCommission',     `₹${commission.toFixed(2)}`);
+  setEl('statTotalSales', `₹${totalSales.toLocaleString('en-IN')}`);
+  setEl('statTotalOrders', totalOrders);
+  setEl('statActiveProducts', activeProducts);
+  setEl('statCommissionOwed', `₹${commission.toLocaleString('en-IN')}`);
 }
 
-// ─── Product Age Helper ────────────────────────────────────────────────────────
-function calculateProductAge(timestamp) {
-  let createdDate;
-  if (timestamp?.toDate) {
-    createdDate = timestamp.toDate();
-  } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
-    createdDate = new Date(timestamp);
-  } else {
-    return '—';
-  }
+// ─── Product Age Helper ───────────────────────────────────────────────────────
+function calculateProductAge(createdAt) {
+  if (!createdAt) return 'Recently';
+  let date;
+  if (createdAt.toDate) date = createdAt.toDate();
+  else if (createdAt.seconds) date = new Date(createdAt.seconds * 1000);
+  else date = new Date(createdAt);
 
-  const now     = new Date();
-  const diffMs  = now - createdDate;
-  const diffH   = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffD   = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const diffM   = Math.floor(diffD / 30);
+  const diffMs = Date.now() - date.getTime();
+  const diffH = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffD = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
   if (diffH < 24) return `Listed today (${diffH}h ago)`;
-  if (diffD < 30) return `Listed ${diffD} day${diffD > 1 ? 's' : ''} ago`;
-  return `Listed ${diffM} month${diffM > 1 ? 's' : ''} ago`;
+  if (diffD < 30) return `Listed ${diffD}d ago`;
+  return `Listed ${Math.floor(diffD / 30)}mo ago`;
 }
 
-// ─── Demo Mode ────────────────────────────────────────────────────────────────
-function loadDemoShop() {
-  currentSeller = {
-    uid:         'demo_seller_uid',
-    displayName: 'Demo Seller',
-    email:       'demo@zulora.local',
-    photoURL:    'https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg'
-  };
-  currentShop = {
-    id:              'demo_shop',
-    ownerUid:        'demo_seller_uid',
-    shopName:        "Demo Fresh Mart",
-    handle:          'demo_fresh_mart',
-    category:        'Grocery',
-    phone:           '9876543210',
-    upiId:           'demoseller@upi',
-    deliveryRadiusKm: 5,
-    description:     'Your friendly neighbourhood demo store.',
-    lat:             PLATFORM_CONSTANTS.DEFAULT_LAT,
-    lng:             PLATFORM_CONSTANTS.DEFAULT_LNG,
-    isOpen:          true,
-    isVerified:      true,
-    customCategories: []
-  };
-
-  showDashboard(currentSeller);
-  populateShopForm(currentShop);
-  loadDemoSellerData();
-  showToast('🔧 Demo mode — no Firebase configured. Using sample data.', 'info', 6000);
-}
-
-function loadDemoSellerData() {
-  const now = new Date().toISOString();
-
-  sellerProducts = [
-    {
-      id:        'demo_prod_1',
-      shopId:    'demo_shop',
-      sellerUid: 'demo_seller_uid',
-      title:     'Organic Basmati Rice 5kg',
-      category:  'Grocery',
-      price:     450,
-      mrp:       520,
-      unit:      '5kg bag',
-      weightKg:  5,
-      stock:     30,
-      inStock:   true,
-      imageUrl:  'https://placehold.co/400x300?text=Basmati+Rice',
-      images:    ['https://placehold.co/400x300?text=Basmati+Rice', 'https://placehold.co/400x300?text=Rice+Bag'],
-      salesCount: 12,
-      createdAt: now
-    },
-    {
-      id:        'demo_prod_2',
-      shopId:    'demo_shop',
-      sellerUid: 'demo_seller_uid',
-      title:     'Fresh Alphonso Mangoes 1kg',
-      category:  'Food',
-      price:     149,
-      mrp:       199,
-      unit:      '1kg',
-      weightKg:  1,
-      stock:     0,
-      inStock:   false,
-      imageUrl:  'https://placehold.co/400x300?text=Alphonso+Mango',
-      images:    ['https://placehold.co/400x300?text=Alphonso+Mango'],
-      salesCount: 8,
-      createdAt: now
-    }
-  ];
-
-  liveOrders = [
-    {
-      id:              'demo_order_abcdef',
-      sellerUid:       'demo_seller_uid',
-      shopId:          'demo_shop',
-      buyerName:       'Priya Sharma',
-      buyerPhone:      '9123456780',
-      deliveryAddress: '12A, MG Road, Koramangala, Bengaluru - 560034',
-      buyerLat:        12.9378,
-      buyerLng:        77.6264,
-      items: [
-        { title: 'Organic Basmati Rice 5kg', qty: 2, price: 450 },
-        { title: 'Fresh Alphonso Mangoes 1kg', qty: 1, price: 149 }
-      ],
-      grandTotal:    1049,
-      paymentMethod: 'UPI',
-      orderStatus:   'Placed',
-      createdAt:     now
-    }
-  ];
-
-  renderSellerProducts();
-  renderSellerOrders();
-  updateDashboardStats();
-}
-
-// ─── XSS Helper ───────────────────────────────────────────────────────────────
+// ─── XSS-safe helper ─────────────────────────────────────────────────────────
 function escapeHtml(str) {
   if (str == null) return '';
   return String(str)

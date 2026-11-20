@@ -14,7 +14,7 @@ export function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
 function toRad(d) { return d * Math.PI / 180; }
 
 export function getEstimatedDeliveryTime(distKm) {
-  if (distKm == null) return '15–25 mins';
+  if (distKm == null) return 'Fast Delivery';
   if (distKm <= 1)  return '10–15 mins';
   if (distKm <= 2)  return '15–20 mins';
   if (distKm <= 6)  return '20–30 mins';
@@ -29,19 +29,34 @@ export function calculateDeliveryFeeAndMinOrder(distKm, totalWeightKg = 0.5) {
   else if (dist <= 2) { minOrder = 100; baseFee = Math.max(15, Math.round(dist * 15)); }
   else { minOrder = 150; baseFee = Math.round(dist * 15); }
   if (totalWeightKg > 2) weightFee = Math.ceil(totalWeightKg - 2) * 10;
-  return { minOrder, deliveryFee: baseFee + weightFee, baseFee, weightFee,
-           distKm: dist, deliveryTime: getEstimatedDeliveryTime(dist) };
+  return {
+    minOrder,
+    deliveryFee: baseFee + weightFee,
+    baseFee,
+    weightFee,
+    distKm: distKm != null ? dist : null,
+    deliveryTime: getEstimatedDeliveryTime(distKm)
+  };
 }
 
 export function getCurrentGpsPosition() {
   return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) { reject(new Error('Geolocation not supported.')); return; }
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation is not supported by your browser.'));
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
-      p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy, isManual: false }),
+      p => resolve({
+        lat: p.coords.latitude,
+        lng: p.coords.longitude,
+        accuracy: p.coords.accuracy,
+        town: `${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}`,
+        isManual: false
+      }),
       err => {
         const saved = getSavedUserLocation();
-        if (saved) resolve(saved);
-        else resolve({ lat: PLATFORM_CONSTANTS.DEFAULT_LAT, lng: PLATFORM_CONSTANTS.DEFAULT_LNG, town: PLATFORM_CONSTANTS.DEFAULT_TOWN, isManual: true, isFallback: true });
+        if (saved && saved.lat != null) resolve(saved);
+        else reject(new Error('GPS permission denied or unavailable. Please enter your location manually.'));
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
@@ -49,9 +64,17 @@ export function getCurrentGpsPosition() {
 }
 
 export function saveUserLocation(loc) {
-  try { localStorage.setItem('zulora_user_location', JSON.stringify(loc)); } catch(e) {}
+  try {
+    if (loc) localStorage.setItem('zulora_user_location', JSON.stringify(loc));
+    else localStorage.removeItem('zulora_user_location');
+  } catch(e) {}
 }
 
 export function getSavedUserLocation() {
-  try { return JSON.parse(localStorage.getItem('zulora_user_location') || 'null'); } catch(e) { return null; }
+  try {
+    const raw = localStorage.getItem('zulora_user_location');
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) {
+    return null;
+  }
 }

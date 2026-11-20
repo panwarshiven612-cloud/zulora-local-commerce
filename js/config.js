@@ -1,6 +1,6 @@
 /**
  * Zulora Local — Exact Platform Configuration v2
- * Fill Firebase + Cloudinary keys — all other constants are production-ready.
+ * Configured with live Firebase + Cloudinary production keys.
  */
 
 export const firebaseConfig = {
@@ -30,8 +30,8 @@ export const PLATFORM_CONSTANTS = {
   GITHUB_REPO: "https://github.com/panwarshiven612-cloud/zulora-local-commerce.git",
   PLATFORM_COMMISSION_RATE: 0.03,
   DEFAULT_DELIVERY_RADIUS_KM: 5.0,
-  DEFAULT_TOWN: "Koramangala, Bengaluru",
-  DEFAULT_LAT: 12.9352,
-  DEFAULT_LNG: 77.6245,
+  DEFAULT_TOWN: "All Locations",
+  DEFAULT_LAT: null,
+  DEFAULT_LNG: null,
   PRESET_CATEGORIES: ["Food", "Crops", "Electronics", "Sweets", "Grocery", "Fashion", "Toys"]
 };

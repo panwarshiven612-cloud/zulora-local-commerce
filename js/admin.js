@@ -1,7 +1,7 @@
 /**
- * Zulora Local — Supreme Admin Master Panel v2
+ * Zulora Local — Supreme Admin Master Panel v2 (Clean & Production-Ready)
  * Strictly restricted to zulora.help@gmail.com
- * Features: verified badge toggle, cross-town GMV, commission ledger, all shops/products/orders
+ * Real Firestore data only — Zero fake/demo products or shops.
  */
 
 import {
@@ -9,6 +9,7 @@ import {
   collection, doc, getDocs, updateDoc, isConfigPlaceholder
 } from './firebase-init.js';
 import { PLATFORM_CONSTANTS } from './config.js';
+import { showToast } from './notifications.js';
 
 // ─── State ─────────────────────────────────────────────────────────────────
 let allShops = [];
@@ -33,18 +34,6 @@ const ordersTableBody  = document.getElementById('ordersTableBody');
 const topProductsCont  = document.getElementById('topProductsContainer');
 const verifiedTableBody= document.getElementById('verifiedTableBody');
 
-// ─── Toast ──────────────────────────────────────────────────────────────────
-window.showToast = function(msg, type = 'info') {
-  let c = document.getElementById('toast-container');
-  if (!c) { c = document.createElement('div'); c.id = 'toast-container'; document.body.appendChild(c); }
-  const icons = { success:'✓', error:'✕', info:'ℹ', warning:'⚠' };
-  const t = document.createElement('div');
-  t.className = `toast toast-${type}`;
-  t.innerHTML = `<span class="toast-icon">${icons[type]||'ℹ'}</span><span class="toast-msg">${msg}</span>`;
-  c.appendChild(t);
-  setTimeout(() => { t.classList.add('toast-exit'); setTimeout(() => t.remove(), 400); }, 3800);
-};
-
 // ─── Init ────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
@@ -60,11 +49,10 @@ function setupEventListeners() {
 // ─── Auth ────────────────────────────────────────────────────────────────────
 function initAdminAuth() {
   if (!auth || isConfigPlaceholder) {
-    const isDemoAdmin = localStorage.getItem('zulora_demo_admin') === 'true';
-    if (isDemoAdmin) { grantAdminAccess(PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL); loadMockAdminData(); }
-    else showGate();
+    showGate();
     return;
   }
+
   onAuthStateChanged(auth, user => {
     if (user && user.email === PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL) {
       currentAdmin = user;
@@ -92,26 +80,19 @@ function grantAdminAccess(email) {
 
 async function handleAdminLogin() {
   if (!auth || isConfigPlaceholder) {
-    const entered = prompt(`Firebase Demo Mode\nEnter admin email to unlock (must be ${PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL}):`,'');
-    if (entered === PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL) {
-      localStorage.setItem('zulora_demo_admin','true');
-      grantAdminAccess(PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL);
-      loadMockAdminData();
-      window.showToast('Supreme Admin access granted (Demo)!', 'success');
-    } else {
-      window.showToast('Unauthorized email.', 'error');
-    }
+    showToast('Firebase authentication is initializing or offline.', 'warning');
     return;
   }
   try {
     await signInWithPopup(auth, googleProvider);
   } catch(e) {
-    window.showToast('Sign-in error: ' + e.message, 'error');
+    if (e.code !== 'auth/popup-closed-by-user') {
+      showToast('Sign-in error: ' + e.message, 'error');
+    }
   }
 }
 
 function handleAdminLogout() {
-  localStorage.removeItem('zulora_demo_admin');
   if (auth && !isConfigPlaceholder) {
     signOut(auth).then(() => window.location.href = './index.html');
   } else {
@@ -119,52 +100,44 @@ function handleAdminLogout() {
   }
 }
 
-// ─── Live Data Load ───────────────────────────────────────────────────────────
+// ─── Real Live Data Load ──────────────────────────────────────────────────────
 async function loadLiveAdminData() {
-  window.showToast('Loading platform data…', 'info');
+  showToast('Loading platform data…', 'info');
+  if (!db || isConfigPlaceholder) {
+    calculateAndRenderMetrics();
+    return;
+  }
+
   try {
     const [shopsSnap, prodsSnap, ordersSnap] = await Promise.all([
-      getDocs(collection(db,'shops')),
-      getDocs(collection(db,'products')),
-      getDocs(collection(db,'orders'))
+      getDocs(collection(db, 'shops')),
+      getDocs(collection(db, 'products')),
+      getDocs(collection(db, 'orders'))
     ]);
-    allShops   = []; shopsSnap.forEach(d => allShops.push({ id: d.id, ...d.data() }));
-    allProducts= []; prodsSnap.forEach(d => allProducts.push({ id: d.id, ...d.data() }));
-    allOrders  = []; ordersSnap.forEach(d => allOrders.push({ id: d.id, ...d.data() }));
+
+    allShops = [];
+    shopsSnap.forEach(d => allShops.push({ id: d.id, ...d.data() }));
+
+    allProducts = [];
+    prodsSnap.forEach(d => allProducts.push({ id: d.id, ...d.data() }));
+
+    allOrders = [];
+    ordersSnap.forEach(d => allOrders.push({ id: d.id, ...d.data() }));
+
     calculateAndRenderMetrics();
   } catch(err) {
     console.error('[Admin] Live data error:', err);
-    window.showToast('Firestore load error — using demo data.', 'warning');
-    loadMockAdminData();
+    showToast('Firestore load error: ' + err.message, 'error');
+    allShops = [];
+    allProducts = [];
+    allOrders = [];
+    calculateAndRenderMetrics();
   }
-}
-
-// ─── Mock Data ───────────────────────────────────────────────────────────────
-function loadMockAdminData() {
-  allShops = [
-    { id:'shop_1', name:'Fresh Farm Organics', handle:'@freshfarm', category:'Food', phone:'9876543210', email:'freshfarm@example.com', upiId:'freshfarm@okhdfcbank', lat:12.9340, lng:77.6220, isOpen:true,  isVerified:true },
-    { id:'shop_2', name:'Royal Bakery & Treats', handle:'@royalbakery', category:'Food', phone:'9876543211', email:'royalbakery@example.com', upiId:'royalbakes@okaxis', lat:12.9420, lng:77.6290, isOpen:true,  isVerified:false },
-    { id:'shop_3', name:'Green Leaf Dairy', handle:'@greenleaf', category:'Food', phone:'9876543212', email:'greenleaf@example.com', upiId:'greenleaf@paytm', lat:12.9280, lng:77.6180, isOpen:true,  isVerified:false }
-  ];
-  allProducts = [
-    { id:'p1', shopId:'shop_1', title:'Hydroponic Tomatoes', price:45, salesCount:38, stock:8, inStock:true },
-    { id:'p2', shopId:'shop_1', title:'Tri-Color Bell Peppers', price:85, salesCount:24, stock:4, inStock:true },
-    { id:'p3', shopId:'shop_2', title:'Sourdough Garlic Bread', price:120, salesCount:19, stock:6, inStock:true },
-    { id:'p4', shopId:'shop_2', title:'Chocolate Croissant', price:90, salesCount:42, stock:3, inStock:true },
-    { id:'p5', shopId:'shop_3', title:'A2 Organic Cow Milk', price:75, salesCount:56, stock:12, inStock:true },
-    { id:'p6', shopId:'shop_3', title:'Mango Pulp Shake', price:60, salesCount:31, stock:7, inStock:true }
-  ];
-  allOrders = [
-    { id:'o1', orderId:'ZUL-938210', shopId:'shop_1', shopName:'Fresh Farm Organics', sellerPhone:'9876543210', buyerName:'Rohan Mehra', buyerPhone:'9999999991', grandTotal:340, paymentMode:'UPI', orderStatus:'Delivered', createdAt: { seconds: Math.floor(Date.now()/1000) - 7200 } },
-    { id:'o2', orderId:'ZUL-849201', shopId:'shop_2', shopName:'Royal Bakery & Treats', sellerPhone:'9876543211', buyerName:'Priya Sharma', buyerPhone:'9999999992', grandTotal:210, paymentMode:'UPI', orderStatus:'Accepted & Packing', createdAt: { seconds: Math.floor(Date.now()/1000) - 14400 } },
-    { id:'o3', orderId:'ZUL-748192', shopId:'shop_3', shopName:'Green Leaf Dairy', sellerPhone:'9876543212', buyerName:'Karthik Raja', buyerPhone:'9999999993', grandTotal:150, paymentMode:'COD', orderStatus:'Delivered', createdAt: { seconds: Math.floor(Date.now()/1000) - 28800 } }
-  ];
-  calculateAndRenderMetrics();
 }
 
 // ─── Metrics & Rendering ─────────────────────────────────────────────────────
 function calculateAndRenderMetrics() {
-  const gmv = allOrders.reduce((s,o) => s + (o.grandTotal||0), 0);
+  const gmv = allOrders.reduce((s, o) => s + (o.totalAmount || o.grandTotal || 0), 0);
   const commission = Math.round(gmv * PLATFORM_CONSTANTS.PLATFORM_COMMISSION_RATE);
 
   if (kpiTotalShops)      kpiTotalShops.textContent      = allShops.length;
@@ -183,28 +156,28 @@ function calculateAndRenderMetrics() {
 function renderVerifiedTable(shops) {
   if (!verifiedTableBody) return;
   if (!shops.length) {
-    verifiedTableBody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:1.5rem;color:var(--slate-500);">No shops registered yet.</td></tr>`;
+    verifiedTableBody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:1.5rem;color:var(--slate-500);">No registered shops found in Firestore yet.</td></tr>`;
     return;
   }
   verifiedTableBody.innerHTML = shops.map(shop => `
     <tr>
       <td>
         <div style="font-weight:800;color:var(--slate-900);">${escapeHtml(shop.name)}</div>
-        <div style="font-size:.75rem;color:var(--azure-700);">${escapeHtml(shop.handle||'')}</div>
+        <div style="font-size:0.75rem;color:var(--azure-700);">${escapeHtml(shop.handle || '')}</div>
       </td>
-      <td style="font-size:.82rem;">${escapeHtml(shop.phone||'')} <br/><span style="color:var(--slate-500);">${escapeHtml(shop.email||'')}</span></td>
+      <td style="font-size:0.82rem;">${escapeHtml(shop.phone || '—')} <br/><span style="color:var(--slate-500);">${escapeHtml(shop.ownerEmail || shop.email || '')}</span></td>
       <td>
         ${shop.isVerified
-          ? `<span style="display:flex;align-items:center;gap:.35rem;">
-               <img src="${PLATFORM_CONSTANTS.VERIFIED_BADGE_URL}" alt="Verified" style="width:20px;height:20px;" />
-               <span style="font-size:.8rem;font-weight:700;color:var(--azure-600);">Verified</span>
+          ? `<span style="display:inline-flex;align-items:center;gap:0.35rem;">
+               <img src="${PLATFORM_CONSTANTS.VERIFIED_BADGE_URL}" alt="Verified" class="verified-badge-sm" />
+               <span style="font-size:0.8rem;font-weight:700;color:var(--azure-600);">Verified</span>
              </span>`
-          : `<span style="font-size:.8rem;font-weight:600;color:var(--slate-400);">Not Verified</span>`
+          : `<span style="font-size:0.8rem;font-weight:600;color:var(--slate-400);">Not Verified</span>`
         }
       </td>
       <td>
         <button class="btn btn-sm ${shop.isVerified ? 'btn-danger' : 'btn-primary'}"
-          onclick="window.toggleVerifiedStatus('${shop.id}', ${!!shop.isVerified})">
+          onclick="window.toggleVerifiedStatus('${shop.id}', ${Boolean(shop.isVerified)})">
           ${shop.isVerified ? '✕ Revoke Verified' : '✓ Grant Verified'}
         </button>
       </td>
@@ -220,18 +193,11 @@ window.toggleVerifiedStatus = async function(shopId, currentState) {
   if (db && !isConfigPlaceholder) {
     try {
       await updateDoc(doc(db, 'shops', shopId), { isVerified: newState });
-      window.showToast(`${shop.name} is now ${newState ? '✓ Verified' : 'Unverified'}.`, newState ? 'success' : 'info');
-      // Refresh data
+      showToast(`${shop.name} is now ${newState ? '✓ Verified' : 'Unverified'}.`, newState ? 'success' : 'info');
       await loadLiveAdminData();
     } catch(e) {
-      window.showToast('Could not update verified status: ' + e.message, 'error');
+      showToast('Could not update verified status: ' + e.message, 'error');
     }
-  } else {
-    // Demo mode — update in-memory
-    shop.isVerified = newState;
-    renderVerifiedTable(allShops);
-    renderShopsTable(allShops);
-    window.showToast(`Demo: ${shop.name} is now ${newState ? '✓ Verified' : 'Unverified'}.`, newState ? 'success' : 'info');
   }
 };
 
@@ -239,48 +205,38 @@ window.toggleVerifiedStatus = async function(shopId, currentState) {
 function renderShopsTable(shops) {
   if (!shopsTableBody) return;
   if (!shops.length) {
-    shopsTableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--slate-500);">No shops found.</td></tr>`;
+    shopsTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--slate-500);">No registered shops found in Firestore yet.</td></tr>`;
     return;
   }
   shopsTableBody.innerHTML = shops.map(shop => {
-    const shopOrders  = allOrders.filter(o => o.shopId === shop.id || o.sellerUid === shop.id);
-    const shopGmv     = shopOrders.reduce((s,o) => s + (o.grandTotal||0), 0);
-    const commission  = Math.round(shopGmv * PLATFORM_CONSTANTS.PLATFORM_COMMISSION_RATE);
-    const cleanPhone  = (shop.phone||'').replace(/[^0-9]/g,'');
-    const callUrl     = `tel:+91${cleanPhone}`;
-    const waMsg       = encodeURIComponent(`Hello ${shop.name}, this is Zulora Admin (zulora.help@gmail.com). Your store generated ₹${shopGmv} GMV. Platform commission owed: ₹${commission}. Please arrange settlement at your earliest. Thank you!`);
-    const waUrl       = `https://wa.me/91${cleanPhone}?text=${waMsg}`;
+    const shopOrders = allOrders.filter(o => o.shopId === shop.id);
+    const shopGmv = shopOrders.reduce((s, o) => s + (o.totalAmount || o.grandTotal || 0), 0);
+    const commOwed = Math.round(shopGmv * PLATFORM_CONSTANTS.PLATFORM_COMMISSION_RATE);
+    const cleanPhone = (shop.phone || '').replace(/[^0-9]/g, '');
+    const callUrl = cleanPhone ? `tel:+91${cleanPhone}` : `tel:${PLATFORM_CONSTANTS.HELPLINE_PHONE}`;
+    const waUrl = cleanPhone ? `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(`Hi ${shop.name}, Zulora Admin inquiry regarding your shop performance and commission settlement.`)}` : '#';
 
     return `
       <tr>
         <td>
-          <div style="font-weight:800;">${escapeHtml(shop.name)}</div>
-          <div style="font-size:.75rem;color:var(--azure-700);">${escapeHtml(shop.handle||'')}</div>
+          <div style="font-weight:700;color:var(--slate-900);">${escapeHtml(shop.name)}</div>
+          <div style="font-size:0.75rem;color:var(--azure-600);">${escapeHtml(shop.handle || '')}</div>
+        </td>
+        <td style="font-size:0.8rem;">
+          ${escapeHtml(shop.phone || '—')}<br/>
+          <span style="color:var(--slate-400);">${escapeHtml(shop.ownerEmail || shop.email || '')}</span>
         </td>
         <td>
-          <div style="font-size:.8rem;">${escapeHtml(shop.phone||'')}</div>
-          <div style="font-size:.72rem;color:var(--slate-500);">${escapeHtml(shop.email||'')}</div>
-        </td>
-        <td>
-          <span class="status-badge ${shop.isOpen!==false ? 'badge-open' : 'badge-closed'}">
-            ● ${shop.isOpen!==false ? 'Open' : 'Closed'}
+          <span class="badge ${shop.isOpen !== false ? 'badge-open' : 'badge-closed'}" style="font-size:0.72rem;">
+            ${shop.isOpen !== false ? '🟢 Open' : '🔴 Closed'}
           </span>
         </td>
+        <td><strong>₹${shopGmv.toLocaleString('en-IN')}</strong> (${shopOrders.length} orders)</td>
+        <td><strong style="color:var(--rose-600);">₹${commOwed.toLocaleString('en-IN')}</strong> (3%)</td>
         <td>
-          ${shop.isVerified
-            ? `<img src="${PLATFORM_CONSTANTS.VERIFIED_BADGE_URL}" alt="Verified" style="width:22px;height:22px;" title="Verified Seller"/>`
-            : `<span style="font-size:.75rem;color:var(--slate-400);">—</span>`}
-        </td>
-        <td style="font-weight:700;">₹${shopGmv.toLocaleString('en-IN')}</td>
-        <td style="font-weight:800;color:var(--rose-600);">₹${commission.toLocaleString('en-IN')}</td>
-        <td>
-          <div style="display:flex;gap:.4rem;flex-wrap:wrap;">
-            <a href="${callUrl}" class="btn btn-secondary btn-sm" title="Call to collect commission">
-              📞 Call
-            </a>
-            <a href="${waUrl}" target="_blank" class="btn btn-whatsapp btn-sm">
-              💬 WhatsApp
-            </a>
+          <div style="display:flex;gap:0.35rem;">
+            <a href="${callUrl}" class="btn btn-sm btn-secondary" style="font-size:0.72rem;padding:0.25rem 0.5rem;">📞 Call</a>
+            <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-whatsapp" style="font-size:0.72rem;padding:0.25rem 0.5rem;">💬 WA</a>
           </div>
         </td>
       </tr>
@@ -292,22 +248,17 @@ function renderShopsTable(shops) {
 function renderOrdersTable(orders) {
   if (!ordersTableBody) return;
   if (!orders.length) {
-    ordersTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--slate-500);">No orders found.</td></tr>`;
+    ordersTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--slate-500);">No orders placed yet.</td></tr>`;
     return;
   }
-  ordersTableBody.innerHTML = orders.map(o => `
+  ordersTableBody.innerHTML = orders.slice(0, 25).map(o => `
     <tr>
-      <td style="font-weight:800;font-family:monospace;color:var(--azure-800);">#${escapeHtml(o.orderId||o.id)}</td>
-      <td>${escapeHtml(o.shopName||'—')}</td>
-      <td>
-        <div style="font-weight:600;">${escapeHtml(o.buyerName||'—')}</div>
-        <div style="font-size:.72rem;color:var(--slate-500);">${escapeHtml(o.buyerPhone||'')}</div>
-      </td>
-      <td style="font-weight:800;">₹${o.grandTotal||0} <span style="font-size:.72rem;color:var(--slate-500);">(${o.paymentMode||'—'})</span></td>
-      <td>
-        <span class="status-badge badge-open" style="font-size:.72rem;">${escapeHtml(o.orderStatus||'Placed')}</span>
-      </td>
-      <td style="font-size:.75rem;color:var(--slate-500);">${formatDate(o.createdAt)}</td>
+      <td style="font-weight:800;font-size:0.82rem;">${escapeHtml(o.orderId || o.id)}</td>
+      <td style="font-size:0.82rem;">${escapeHtml(o.shopName || '—')}</td>
+      <td style="font-size:0.82rem;">${escapeHtml(o.buyerName || '—')}<br/><span style="color:var(--slate-400);">${escapeHtml(o.buyerPhone || '')}</span></td>
+      <td style="font-weight:700;">₹${o.totalAmount || o.grandTotal || 0} <span style="font-size:0.72rem;color:var(--slate-500);">(${escapeHtml(o.paymentMode || o.paymentMethod || 'COD')})</span></td>
+      <td><span class="badge" style="background:var(--azure-100);color:var(--azure-800);font-size:0.72rem;">${escapeHtml(o.orderStatus || 'Placed')}</span></td>
+      <td style="font-size:0.75rem;color:var(--slate-400);">${formatDate(o.createdAt)}</td>
     </tr>
   `).join('');
 }
@@ -315,38 +266,30 @@ function renderOrdersTable(orders) {
 // ─── Top Products ─────────────────────────────────────────────────────────────
 function renderTopProducts(products) {
   if (!topProductsCont) return;
-  const sorted = [...products].sort((a,b)=>(b.salesCount||0)-(a.salesCount||0)).slice(0,5);
-  if (!sorted.length) { topProductsCont.innerHTML = '<p style="color:var(--slate-500);font-size:.85rem;">No products yet.</p>'; return; }
-  topProductsCont.innerHTML = sorted.map((p,i) => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:.6rem 0;border-bottom:1px solid var(--slate-100);">
-      <div style="display:flex;align-items:center;gap:.6rem;">
-        <span style="font-size:.9rem;font-weight:800;color:var(--azure-600);width:20px;">#${i+1}</span>
-        <div>
-          <div style="font-size:.85rem;font-weight:700;color:var(--slate-900);">${escapeHtml(p.title)}</div>
-          <div style="font-size:.72rem;color:var(--slate-500);">₹${p.price}</div>
-        </div>
-      </div>
-      <span style="font-size:.8rem;font-weight:800;color:var(--emerald-600);">${p.salesCount||0} sold</span>
+  if (!products.length) {
+    topProductsCont.innerHTML = `<p style="color:var(--slate-500);font-size:0.85rem;padding:0.5rem;">No products uploaded yet.</p>`;
+    return;
+  }
+  const sorted = [...products].sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0)).slice(0, 5);
+  topProductsCont.innerHTML = sorted.map((p, i) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0;border-bottom:1px dashed var(--slate-200);font-size:0.82rem;">
+      <span><strong>#${i + 1}</strong> ${escapeHtml(p.title)}</span>
+      <span style="font-weight:700;color:var(--azure-700);">${p.salesCount || 0} sold (₹${p.price})</span>
     </div>
   `).join('');
 }
 
-// ─── Search Filter ────────────────────────────────────────────────────────────
-function filterAdminView(q) {
-  if (!q) { calculateAndRenderMetrics(); return; }
-  const fs = allShops.filter(s =>
-    (s.name||'').toLowerCase().includes(q) ||
-    (s.handle||'').toLowerCase().includes(q) ||
-    (s.phone||'').includes(q)
-  );
-  const fo = allOrders.filter(o =>
-    (o.orderId||'').toLowerCase().includes(q) ||
-    (o.shopName||'').toLowerCase().includes(q) ||
-    (o.buyerName||'').toLowerCase().includes(q)
-  );
-  renderVerifiedTable(fs);
-  renderShopsTable(fs);
-  renderOrdersTable(fo);
+// ─── Search / Filter ──────────────────────────────────────────────────────────
+function filterAdminView(query) {
+  if (!query) {
+    calculateAndRenderMetrics();
+    return;
+  }
+  const fShops = allShops.filter(s => (s.name + ' ' + (s.handle || '') + ' ' + (s.phone || '')).toLowerCase().includes(query));
+  const fOrders = allOrders.filter(o => ((o.orderId || '') + ' ' + (o.shopName || '') + ' ' + (o.buyerName || '')).toLowerCase().includes(query));
+  renderVerifiedTable(fShops);
+  renderShopsTable(fShops);
+  renderOrdersTable(fOrders);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -356,10 +299,15 @@ function formatDate(ts) {
   if (ts.toDate) d = ts.toDate();
   else if (ts.seconds) d = new Date(ts.seconds * 1000);
   else d = new Date(ts);
-  return d.toLocaleDateString('en-IN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  return d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function escapeHtml(str) {
   if (!str) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
