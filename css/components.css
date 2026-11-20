@@ -1,0 +1,388 @@
+/* ==========================================================================
+   Zulora Local — Components Stylesheet (css/components.css)
+   Blinkit-Inspired Product Cards, 4:3 Gallery, Steppers, Badges, Buttons
+   ========================================================================== */
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.18s ease-in-out;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--azure-500);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--azure-600);
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.3);
+}
+
+.btn-secondary {
+  background: var(--azure-50);
+  color: var(--azure-700);
+  border-color: var(--azure-200);
+}
+.btn-secondary:hover {
+  background: var(--azure-100);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--slate-600);
+}
+.btn-ghost:hover {
+  background: var(--slate-100);
+  color: var(--slate-900);
+}
+
+.btn-whatsapp {
+  background: #25D366;
+  color: #fff;
+}
+.btn-whatsapp:hover {
+  background: #1da851;
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+}
+
+.btn-danger {
+  background: var(--rose-50);
+  color: var(--rose-600);
+  border-color: var(--rose-200);
+}
+.btn-danger:hover {
+  background: var(--rose-500);
+  color: #fff;
+}
+
+.btn-sm {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.72rem;
+}
+
+.btn-lg {
+  padding: 0.65rem 1.25rem;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-full);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--slate-200);
+  color: var(--slate-700);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+.btn-icon:hover {
+  background: var(--azure-50);
+  border-color: var(--azure-300);
+}
+
+/* ─── Product Card (Blinkit Style) ───────────────────────────────────────── */
+.product-card {
+  background: var(--pearl-glass-card);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+  position: relative;
+}
+
+.product-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--glass-shadow-lg);
+  border-color: var(--azure-300);
+}
+
+/* Fixed 4:3 Gallery Container */
+.card-image-wrap,
+.img-carousel,
+.product-carousel,
+.modal-image-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3 !important;
+  max-height: 240px;
+  overflow: hidden !important;
+  background: var(--slate-100);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.product-img,
+.carousel-img,
+.card-image-wrap img,
+.img-carousel img,
+.product-carousel img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  transition: transform 0.25s ease;
+}
+
+.product-card:hover .product-img,
+.product-card:hover .carousel-img {
+  transform: scale(1.03);
+}
+
+/* Carousel Controls */
+.carousel-prev,
+.carousel-next {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  cursor: pointer;
+  z-index: 5;
+  transition: background 0.15s;
+}
+.carousel-prev:hover,
+.carousel-next:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+.carousel-prev { left: 5px; }
+.carousel-next { right: 5px; }
+
+.carousel-dots {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 3px;
+  z-index: 5;
+}
+.carousel-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  display: inline-block;
+}
+.carousel-dot.active {
+  background: #fff;
+  width: 12px;
+  border-radius: 3px;
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-full);
+}
+
+.badge-distance {
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+
+.badge-time {
+  background: rgba(2, 132, 199, 0.85);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+
+.badge-shop-status {
+  backdrop-filter: blur(4px);
+}
+.badge-open {
+  background: rgba(16, 185, 129, 0.85);
+  color: #fff;
+}
+.badge-closed {
+  background: rgba(239, 68, 68, 0.85);
+  color: #fff;
+}
+
+/* ─── Cart Action Stepper (Blinkit Style + / -) ──────────────────────────── */
+.product-cart-action {
+  margin-top: auto;
+}
+
+.btn-add-cart {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  background: #fff;
+  border: 1.5px solid var(--azure-500);
+  border-radius: var(--radius-md);
+  color: var(--azure-600);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.18s;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.btn-add-cart:hover {
+  background: var(--azure-500);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
+}
+
+.btn-out-of-stock {
+  background: var(--slate-100) !important;
+  border-color: var(--slate-300) !important;
+  color: var(--slate-400) !important;
+  cursor: not-allowed !important;
+}
+
+.qty-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--azure-500);
+  border-radius: var(--radius-md);
+  color: #fff;
+  font-weight: 800;
+  overflow: hidden;
+}
+
+.qty-btn {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #fff;
+  cursor: pointer;
+  background: none;
+  border: none;
+  transition: background 0.15s;
+}
+.qty-btn:hover {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.qty-count {
+  font-size: var(--text-xs);
+  padding: 0 0.4rem;
+}
+
+/* ─── Floating Cart Bar ──────────────────────────────────────────────────── */
+.floating-cart-bar {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  right: 1rem;
+  max-width: 600px;
+  margin: 0 auto;
+  background: var(--azure-600);
+  color: #fff;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 8px 30px rgba(2, 132, 199, 0.35);
+  z-index: 200;
+  animation: slideUp 0.25s ease-out;
+}
+
+.floating-cart-bar.hidden {
+  display: none !important;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.cart-count-badge {
+  font-size: var(--text-xs);
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+}
+
+.cart-total {
+  font-size: var(--text-sm);
+  font-weight: 800;
+  margin-left: 0.4rem;
+}
+
+/* ─── Toast Notifications ────────────────────────────────────────────────── */
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: var(--z-toast);
+  pointer-events: none;
+  max-width: 360px;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fff;
+  color: var(--slate-900);
+  border: 1px solid var(--slate-200);
+  border-left: 4px solid var(--azure-500);
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  font-size: var(--text-xs);
+  animation: fadeIn 0.2s ease;
+}
+
+.toast.toast-success { border-left-color: var(--emerald-500); }
+.toast.toast-warning { border-left-color: var(--amber-500); }
+.toast.toast-error   { border-left-color: var(--rose-500); }
+
+.toast.toast-exit {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

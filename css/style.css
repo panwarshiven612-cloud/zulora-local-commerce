@@ -1,7 +1,11 @@
 /* ==========================================================================
    Zulora Local — Pearl & Azure Glassmorphic Design System
-   Complete stylesheet v2 — All 24 sections
+   Modular Master Bundler
    ========================================================================== */
+@import './base.css';
+@import './layout.css';
+@import './components.css';
+@import './modals.css';
 
 /* ─── 1. CSS Variables (:root) ─────────────────────────────────────────── */
 :root {

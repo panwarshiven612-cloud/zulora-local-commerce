@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#6C63FF" />
+  <meta name="theme-color" content="#0284C7" />
 
   <!-- SEO Meta Tags -->
-  <title>Zulora Local – Hyperlocal Quick Commerce Near You</title>
-  <meta name="description" content="Zulora Local is your hyperlocal quick commerce platform. Buy fresh food, groceries, electronics, fashion and more from sellers right in your neighbourhood." />
+  <title>Zulora Local – Hyperlocal Quick Commerce by Zulora AI</title>
+  <meta name="description" content="Zulora Local is your hyperlocal quick commerce platform. Buy fresh food, crops, groceries, electronics, sweets and more directly from neighbourhood sellers." />
   <meta name="keywords" content="Zulora Local, hyperlocal commerce, quick commerce, local sellers, groceries, food, electronics, nearby shops, Zulora AI" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://zulora-local.vercel.app/" />
 
   <!-- Open Graph -->
   <meta property="og:title" content="Zulora Local – Hyperlocal Quick Commerce Near You" />
-  <meta property="og:description" content="Buy from local sellers near you – fresh food, groceries, electronics, fashion and more, delivered fast with Zulora Local." />
+  <meta property="og:description" content="Buy from local sellers near you – fresh food, crops, electronics, sweets and more, delivered fast with Zulora Local." />
   <meta property="og:image" content="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://zulora-local.vercel.app/" />
@@ -23,7 +23,7 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Zulora Local – Hyperlocal Quick Commerce Near You" />
-  <meta name="twitter:description" content="Buy from local sellers near you – fresh food, groceries, electronics, fashion and more, delivered fast with Zulora Local." />
+  <meta name="twitter:description" content="Buy from local sellers near you – fresh food, crops, electronics, sweets and more, delivered fast with Zulora Local." />
   <meta name="twitter:image" content="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" />
 
   <!-- JSON-LD Structured Data -->
@@ -60,13 +60,13 @@
   <link rel="icon" href="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" type="image/jpeg" />
   <link rel="apple-touch-icon" href="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" />
 
-  <!-- Stylesheet -->
+  <!-- Stylesheets (Modular & Master Bundler) -->
   <link rel="stylesheet" href="./css/style.css" />
 </head>
 <body>
 
   <!-- ═══════════════════════════════════════════════
-       NAVBAR
+       NAVBAR (Blinkit-Style + Pearl & Azure Accents)
   ═══════════════════════════════════════════════ -->
   <nav class="navbar">
     <div class="navbar-brand">
@@ -78,19 +78,19 @@
     </div>
 
     <div class="navbar-actions">
-      <a href="./seller.html" class="btn btn-seller">🛒 Seller Mode / My Shop</a>
-      <a href="./orders.html" class="btn btn-orders">📦 My Orders</a>
-      <a href="./admin.html" id="navAdminLink" class="btn btn-admin hidden">⚙️ Admin</a>
-      <button id="btnInstallApp" class="btn btn-install hidden">📲 Install App</button>
+      <a href="./seller.html" class="btn btn-secondary">🛒 Become a Seller / My Shop</a>
+      <a href="./orders.html" class="btn btn-ghost">📦 My Orders</a>
+      <a href="./admin.html" id="navAdminLink" class="btn btn-danger hidden">⚙️ Admin</a>
+      <button id="btnInstallApp" class="btn btn-ghost hidden">📲 Install App</button>
 
       <!-- Notification Bell -->
-      <button id="btnNotifBell" class="btn btn-icon" aria-label="Notifications">
+      <button id="btnNotifBell" class="btn btn-icon" aria-label="Notifications" title="Notifications">
         🔔 <span id="notifBadge" class="hidden">0</span>
       </button>
 
-      <!-- Auth -->
-      <button id="authBtn" class="btn btn-auth">
-        <svg class="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="18" height="18">
+      <!-- Auth Action -->
+      <button id="authBtn" class="btn btn-primary">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="16" height="16" style="margin-right:4px;">
           <path fill="#4285F4" d="M24 9.5c3.1 0 5.8 1.1 8 2.9l5.9-5.9C34.4 3.5 29.5 1.5 24 1.5 14.9 1.5 7.2 7.1 4 15l6.9 5.4C12.5 13.6 17.8 9.5 24 9.5z"/>
           <path fill="#34A853" d="M46.5 24c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.4 5.7C43.4 36.9 46.5 30.9 46.5 24z"/>
           <path fill="#FBBC05" d="M10.9 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.1.8-4.6L3.4 14C1.8 17.1 1 20.5 1 24s.8 6.9 2.4 10l7.5-5.4z"/>
@@ -99,36 +99,36 @@
         Sign in with Google
       </button>
 
-      <div id="userMenu" class="user-menu hidden">
-        <img id="userAvatar" src="" alt="User Avatar" class="user-avatar" />
-        <span id="userName" class="user-name"></span>
-        <button id="signOutBtn" class="btn btn-signout">Sign Out</button>
+      <div id="userMenu" class="user-menu hidden" style="display:flex;align-items:center;gap:0.4rem;">
+        <img id="userAvatar" src="" alt="Avatar" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--azure-400);" />
+        <span id="userName" style="font-size:0.8rem;font-weight:700;"></span>
+        <button id="signOutBtn" class="btn btn-ghost btn-sm" title="Sign Out">Sign Out</button>
       </div>
 
       <!-- Refresh -->
-      <button id="btnRefreshData" class="btn btn-icon" aria-label="Refresh">↻ Refresh</button>
+      <button id="btnRefreshData" class="btn btn-icon" aria-label="Refresh Products" title="Refresh">↻</button>
     </div>
   </nav>
 
   <!-- ═══════════════════════════════════════════════
        PWA INSTALL BANNER
   ═══════════════════════════════════════════════ -->
-  <div id="pwaInstallBanner" class="pwa-install-banner hidden" role="banner">
-    <div class="pwa-install-content">
-      <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Zulora Local" class="pwa-install-logo" />
-      <div class="pwa-install-text">
+  <div id="pwaInstallBanner" class="pwa-install-banner hidden" role="banner" style="background:#fff;border-bottom:1px solid var(--slate-200);padding:0.5rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:0.5rem;">
+    <div style="display:flex;align-items:center;gap:0.6rem;">
+      <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Zulora Local" class="navbar-logo" />
+      <div style="font-size:0.8rem;">
         <strong>Install Zulora App</strong>
-        <span>Get fast access, offline support & notifications</span>
+        <span style="color:var(--slate-500);display:block;">Instant orders, offline support & updates</span>
       </div>
     </div>
-    <div class="pwa-install-actions">
-      <button id="btnPwaInstall" class="btn btn-primary">Install</button>
-      <button id="btnPwaDismiss" class="btn btn-ghost">✕ Dismiss</button>
+    <div style="display:flex;gap:0.4rem;">
+      <button id="btnPwaInstall" class="btn btn-primary btn-sm">Install</button>
+      <button id="btnPwaDismiss" class="btn btn-ghost btn-sm">✕</button>
     </div>
   </div>
 
   <!-- ═══════════════════════════════════════════════
-       LOCATION BANNER
+       LOCATION BANNER & SELECTOR
   ═══════════════════════════════════════════════ -->
   <div class="location-banner">
     <div class="location-info">
@@ -136,17 +136,17 @@
       <span id="locationTownText" class="location-town">All Locations (Worldwide)</span>
     </div>
     <div class="location-controls">
-      <button id="btnDetectGps" class="btn btn-gps">🛰️ Detect GPS</button>
-      <button id="btnManualLocation" class="btn btn-manual">✏️ Change</button>
+      <button id="btnDetectGps" class="btn btn-secondary btn-sm">🛰️ Detect GPS</button>
+      <button id="btnManualLocation" class="btn btn-ghost btn-sm">✏️ Select Location</button>
     </div>
     <div class="location-filter">
-      <button id="filterAllBtn" class="filter-btn active">All Products</button>
-      <button id="filterNearbyBtn" class="filter-btn">⚡ Nearby Only</button>
+      <button id="filterAllBtn" class="filter-btn active" style="font-size:0.75rem;padding:0.25rem 0.6rem;border-radius:var(--radius-full);border:1px solid var(--azure-500);background:var(--azure-500);color:#fff;cursor:pointer;">All Products</button>
+      <button id="filterNearbyBtn" class="filter-btn" style="font-size:0.75rem;padding:0.25rem 0.6rem;border-radius:var(--radius-full);border:1px solid var(--slate-300);background:#fff;color:var(--slate-700);cursor:pointer;">⚡ Nearby Only</button>
     </div>
   </div>
 
   <!-- ═══════════════════════════════════════════════
-       SEARCH HERO
+       SEARCH HERO & LIVE SUGGESTIONS
   ═══════════════════════════════════════════════ -->
   <section class="search-hero" aria-label="Product Search">
     <div class="search-wrapper">
@@ -155,11 +155,13 @@
         type="search"
         id="searchInput"
         class="search-input"
-        placeholder="Search products, shops, categories…"
+        placeholder="Search fresh crops, food, snacks, electronics, sweets…"
         autocomplete="off"
         aria-label="Search products"
       />
     </div>
+    <!-- Live suggestions list dropdown -->
+    <div id="searchSuggestions" class="search-suggestions"></div>
   </section>
 
   <!-- ═══════════════════════════════════════════════
@@ -172,57 +174,103 @@
     <div class="category-pill" data-category="Electronics" role="listitem" tabindex="0">📱 Electronics</div>
     <div class="category-pill" data-category="Sweets" role="listitem" tabindex="0">🍬 Sweets</div>
     <div class="category-pill" data-category="Grocery" role="listitem" tabindex="0">🛒 Grocery</div>
+    <div class="category-pill" data-category="Snacks" role="listitem" tabindex="0">🍿 Snacks</div>
+    <div class="category-pill" data-category="Beverages" role="listitem" tabindex="0">🧃 Beverages</div>
     <div class="category-pill" data-category="Fashion" role="listitem" tabindex="0">👗 Fashion</div>
     <div class="category-pill" data-category="Toys" role="listitem" tabindex="0">🧸 Toys</div>
   </div>
 
   <!-- ═══════════════════════════════════════════════
-       MAIN CONTENT — PRODUCT GRID
+       MAIN CONTENT — REAL PRODUCT GRID
   ═══════════════════════════════════════════════ -->
   <main class="main-content" id="mainContent">
     <div class="section-header">
-      <h2 class="section-title">⚡ Zulora Local Showcase</h2>
+      <h2 class="section-title">⚡ Zulora Local Storefront</h2>
       <span id="productCount" class="product-count">Loading products…</span>
     </div>
 
     <div id="productGrid" class="product-grid" role="list" aria-label="Products">
-      <!-- Product cards injected by app.js
-           Each card structure (reference for JS):
-           <div class="product-card" role="listitem">
-             <div class="card-carousel">
-               <button class="carousel-prev" aria-label="Previous image">‹</button>
-               <div class="carousel-images">
-                 <img class="carousel-img active" src="..." alt="..." />
-               </div>
-               <button class="carousel-next" aria-label="Next image">›</button>
-               <div class="carousel-dots"></div>
-             </div>
-             <div class="card-body">
-               <h3 class="card-title"></h3>
-               <p class="card-price"></p>
-               <p class="card-seller"></p>
-               <button class="btn-add-cart">Add to Cart</button>
-             </div>
-           </div>
-      -->
+      <!-- Real product cards injected by app.js (Zero fake products) -->
     </div>
   </main>
 
   <!-- ═══════════════════════════════════════════════
+       ABOUT ZULORA & ECOSYSTEM SECTION
+  ═══════════════════════════════════════════════ -->
+  <section class="ecosystem-section" aria-label="About Zulora Ecosystem">
+    <div class="ecosystem-header">
+      <h2>🌐 The Zulora Ecosystem</h2>
+      <p>
+        Zulora empowers communities with next-generation AI tools, cloud storage, modern education, and commission-free hyperlocal quick commerce.
+      </p>
+    </div>
+
+    <div class="ecosystem-grid">
+      <!-- Ecosystem Card 1: Zulora AI Main -->
+      <div class="ecosystem-card">
+        <div>
+          <div class="ecosystem-card-icon">🤖</div>
+          <h3>Zulora AI</h3>
+          <p>The core intelligence platform building autonomous tools, AI systems, and commerce infrastructure for modern India.</p>
+        </div>
+        <a href="https://zulora.in" target="_blank" rel="noopener" class="ecosystem-card-link">
+          Visit zulora.in ↗
+        </a>
+      </div>
+
+      <!-- Ecosystem Card 2: Zulora Drive -->
+      <div class="ecosystem-card">
+        <div>
+          <div class="ecosystem-card-icon">☁️</div>
+          <h3>Zulora Cloud Drive</h3>
+          <p>Secure, ultra-fast personal and enterprise cloud storage designed for seamless data backup and file collaboration.</p>
+        </div>
+        <a href="https://drive.zulora.in" target="_blank" rel="noopener" class="ecosystem-card-link">
+          Visit drive.zulora.in ↗
+        </a>
+      </div>
+
+      <!-- Ecosystem Card 3: Zulora School Platform -->
+      <div class="ecosystem-card">
+        <div>
+          <div class="ecosystem-card-icon">🎓</div>
+          <h3>Zulora School</h3>
+          <p>Interactive AI-powered learning environment and curriculum platform for students, teachers, and educational institutions.</p>
+        </div>
+        <a href="https://school.zulora.in" target="_blank" rel="noopener" class="ecosystem-card-link">
+          Visit school.zulora.in ↗
+        </a>
+      </div>
+
+      <!-- Ecosystem Card 4: Zulora Local Commerce -->
+      <div class="ecosystem-card">
+        <div>
+          <div class="ecosystem-card-icon">⚡</div>
+          <h3>Zulora Local</h3>
+          <p>Zero-commission hyperlocal marketplace connecting neighbourhood merchants, farmers, and shoppers with instant delivery.</p>
+        </div>
+        <a href="./seller.html" class="ecosystem-card-link">
+          Open Seller Studio →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
        NOTIFICATION DRAWER
   ═══════════════════════════════════════════════ -->
+  <div id="drawerBackdrop" class="drawer-backdrop"></div>
+
   <aside id="notifDrawer" class="drawer notif-drawer hidden" aria-label="Notifications" role="complementary">
     <div class="drawer-header">
-      <h3 class="drawer-title">Notifications</h3>
-      <div class="drawer-header-actions">
-        <button id="btnMarkAllRead" class="btn btn-ghost btn-sm">✓ Mark all read</button>
+      <h3 class="drawer-title">🔔 Notifications</h3>
+      <div style="display:flex;gap:0.4rem;">
+        <button id="btnMarkAllRead" class="btn btn-ghost btn-sm">✓ Mark read</button>
         <button id="btnCloseNotifDrawer" class="btn btn-icon" aria-label="Close notifications">✕</button>
       </div>
     </div>
     <div class="drawer-body">
-      <div id="notifDrawerList" class="notif-list">
-        <!-- Notifications injected by app.js -->
-      </div>
+      <div id="notifDrawerList" class="notif-list"></div>
     </div>
   </aside>
 
@@ -230,43 +278,26 @@
        FLOATING CART BAR
   ═══════════════════════════════════════════════ -->
   <div id="floatingCartBar" class="floating-cart-bar hidden" role="complementary" aria-label="Cart summary">
-    <div class="floating-cart-info">
+    <div>
       <span class="cart-count-badge"><span id="floatingCartCount">0</span> items</span>
       <span class="cart-total">₹<span id="floatingCartTotal">0.00</span></span>
     </div>
-    <button id="btnOpenCart" class="btn btn-primary">View Cart &amp; Checkout →</button>
+    <button id="btnOpenCart" class="btn btn-primary btn-sm" style="background:#fff;color:var(--azure-600);border-radius:var(--radius-full);padding:0.4rem 0.85rem;">
+      View Cart →
+    </button>
   </div>
 
   <!-- ═══════════════════════════════════════════════
-       CART DRAWER
+       CART DRAWER (Multi-Shop Splitting)
   ═══════════════════════════════════════════════ -->
   <aside id="cartDrawer" class="drawer cart-drawer" aria-label="Shopping Cart" role="complementary">
     <div class="drawer-header">
-      <div class="cart-header-top">
-        <h3 class="drawer-title">🛒 Shopping Cart</h3>
-        <button id="closeCartDrawer" class="btn btn-icon" aria-label="Close cart">✕</button>
-      </div>
-      <div class="cart-smart-label">
-        <span class="smart-badge">✦ Smart Multi-Shop Splitting</span>
-        <span class="smart-desc">Your order is split per seller for fastest delivery</span>
-      </div>
+      <h3 class="drawer-title">🛒 Shopping Cart</h3>
+      <button id="closeCartDrawer" class="btn btn-icon" aria-label="Close cart">✕</button>
     </div>
-    <div class="drawer-body">
-      <div id="cartDrawerBody" class="cart-drawer-body">
-        <!-- Cart items injected by app.js -->
-      </div>
-    </div>
-    <div class="drawer-footer">
-      <div id="cartDrawerFooter" class="cart-drawer-footer">
-        <!-- Cart totals & checkout button injected by app.js -->
-      </div>
-    </div>
+    <div id="cartDrawerBody" class="drawer-body"></div>
+    <div id="cartDrawerFooter" class="drawer-footer"></div>
   </aside>
-
-  <!-- ═══════════════════════════════════════════════
-       DRAWER BACKDROP
-  ═══════════════════════════════════════════════ -->
-  <div id="drawerBackdrop" class="drawer-backdrop" aria-hidden="true"></div>
 
   <!-- ═══════════════════════════════════════════════
        TOAST CONTAINER
@@ -285,19 +316,31 @@
           <div class="footer-tagline">Hyperlocal Quick Commerce by Zulora AI</div>
         </div>
       </div>
+
       <div class="footer-contact">
         <div class="footer-contact-title">Helpline &amp; Support</div>
         <a href="mailto:zulora.help@gmail.com" class="footer-contact-link">📧 zulora.help@gmail.com</a>
         <a href="tel:+916395211325" class="footer-contact-link">📞 +91 6395211325</a>
         <a href="https://wa.me/916395211325" target="_blank" rel="noopener noreferrer" class="footer-contact-link">💬 WhatsApp Support</a>
       </div>
-      <div class="footer-links">
-        <a href="./seller.html">Become a Seller</a>
-        <a href="./orders.html">Track Orders</a>
-        <a href="mailto:zulora.help@gmail.com">Report Issue</a>
+
+      <div class="footer-contact">
+        <div class="footer-contact-title">Zulora Ecosystem</div>
+        <a href="https://zulora.in" target="_blank" rel="noopener" class="footer-nav-link">🌐 Zulora AI (zulora.in)</a>
+        <a href="https://drive.zulora.in" target="_blank" rel="noopener" class="footer-nav-link">☁️ Zulora Drive (drive.zulora.in)</a>
+        <a href="https://school.zulora.in" target="_blank" rel="noopener" class="footer-nav-link">🎓 Zulora School (school.zulora.in)</a>
+        <a href="./seller.html" class="footer-nav-link">🏪 Open Seller Studio</a>
       </div>
     </div>
-    <div class="footer-bottom">© 2026 Zulora AI. All Rights Reserved. | Hyperlocal Quick Commerce Platform</div>
+
+    <div class="footer-bottom">
+      <span>© 2026 Zulora AI. All Rights Reserved.</span>
+      <div style="display:flex;gap:0.75rem;">
+        <a href="./orders.html" style="color:rgba(255,255,255,0.7);">Track Orders</a>
+        <a href="./seller.html" style="color:rgba(255,255,255,0.7);">Seller Mode</a>
+        <a href="mailto:zulora.help@gmail.com" style="color:rgba(255,255,255,0.7);">Report Issue</a>
+      </div>
+    </div>
   </footer>
 
   <!-- ═══════════════════════════════════════════════

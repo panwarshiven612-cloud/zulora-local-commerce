@@ -1,12 +1,18 @@
-const CACHE_NAME = 'zulora-local-v2';
+const CACHE_NAME = 'zulora-local-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './seller.html',
   './orders.html',
   './admin.html',
+  './css/base.css',
+  './css/layout.css',
+  './css/components.css',
+  './css/modals.css',
   './css/style.css',
   './js/config.js',
+  './js/auth.js',
+  './js/cart.js',
   './js/firebase-init.js',
   './js/cloudinary.js',
   './js/geo-pricing.js',

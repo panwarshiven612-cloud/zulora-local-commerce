@@ -1,6 +1,7 @@
 /**
  * Zulora Local — Exact Platform Configuration v2
- * Configured with live Firebase + Cloudinary production keys.
+ * Configured with live Firebase Spark + Cloudinary production keys.
+ * Zero paid dependencies, zero SMS OTP, 100% static hosting on Vercel.
  */
 
 export const firebaseConfig = {
@@ -23,6 +24,11 @@ export const PLATFORM_CONSTANTS = {
   TAGLINE: "Hyperlocal Quick Commerce by Zulora AI",
   BRAND_LOGO_URL: "https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg",
   VERIFIED_BADGE_URL: "https://i.postimg.cc/MZVr9JS2/LS20260530205459.png",
+  ECOSYSTEM: {
+    MAIN: "https://zulora.in",
+    DRIVE: "https://drive.zulora.in",
+    SCHOOL: "https://school.zulora.in"
+  },
   SUPREME_ADMIN_EMAIL: "zulora.help@gmail.com",
   HELPLINE_PHONE: "+916395211325",
   HELPLINE_PHONE_DISPLAY: "+91 6395211325",
@@ -33,5 +39,15 @@ export const PLATFORM_CONSTANTS = {
   DEFAULT_TOWN: "All Locations",
   DEFAULT_LAT: null,
   DEFAULT_LNG: null,
-  PRESET_CATEGORIES: ["Food", "Crops", "Electronics", "Sweets", "Grocery", "Fashion", "Toys"]
+  PRESET_CATEGORIES: [
+    "Food",
+    "Crops",
+    "Electronics",
+    "Sweets",
+    "Grocery",
+    "Snacks",
+    "Beverages",
+    "Fashion",
+    "Toys"
+  ]
 };
