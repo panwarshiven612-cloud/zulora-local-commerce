@@ -57,22 +57,84 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ─── Event Listeners ──────────────────────────────────────────────────────────
 function setupEventListeners() {
-  // Auth
-  document.getElementById('authBtn')?.addEventListener('click', handleSignInAction);
+  // Navigation & 3-Bar Hamburger Drawer
+  document.getElementById('btnHamburgerMenu')?.addEventListener('click', openMenuDrawer);
+  document.getElementById('btnCloseMenuDrawer')?.addEventListener('click', closeMenuDrawer);
+  document.getElementById('topLocationPill')?.addEventListener('click', openLocationSetupModal);
+  document.getElementById('navCartBtn')?.addEventListener('click', openCart);
+
+  // Drawer Menu Navigation Links
+  document.getElementById('menuItemLocation')?.addEventListener('click', () => {
+    closeMenuDrawer();
+    openLocationSetupModal();
+  });
+  document.getElementById('menuItemSettings')?.addEventListener('click', () => {
+    closeMenuDrawer();
+    openSettingsModal();
+  });
+  document.getElementById('menuItemAbout')?.addEventListener('click', () => {
+    closeMenuDrawer();
+    openAboutModal();
+  });
+  document.getElementById('menuItemTerms')?.addEventListener('click', () => {
+    closeMenuDrawer();
+    openTermsModal();
+  });
+  document.getElementById('drawerUserCard')?.addEventListener('click', () => {
+    if (!currentUser) {
+      closeMenuDrawer();
+      openSignInModal();
+    }
+  });
+
+  // Auth Modals & Actions
+  document.getElementById('authBtn')?.addEventListener('click', openSignInModal);
+  document.getElementById('btnCloseSignInModal')?.addEventListener('click', closeSignInModal);
+  document.getElementById('modalGoogleSignInBtn')?.addEventListener('click', async () => {
+    closeSignInModal();
+    await handleSignInAction();
+  });
   document.getElementById('signOutBtn')?.addEventListener('click', handleSignOutAction);
 
-  // Location
+  // Informational Modals
+  document.getElementById('btnCloseTermsModal')?.addEventListener('click', closeTermsModal);
+  document.getElementById('btnAgreeTerms')?.addEventListener('click', closeTermsModal);
+  document.getElementById('btnCloseSettingsModal')?.addEventListener('click', closeSettingsModal);
+  document.getElementById('btnSettingsChangeLocation')?.addEventListener('click', () => {
+    closeSettingsModal();
+    openLocationSetupModal();
+  });
+  document.getElementById('btnSettingsEnablePush')?.addEventListener('click', async () => {
+    if (!('Notification' in window)) {
+      showToast('Notifications not supported in this browser.', 'warning');
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      showToast('Push notifications enabled!', 'success');
+      addNotification('🔔 You will now receive live order and deal notifications!', 'success');
+    } else {
+      showToast('Notification permission was not granted.', 'info');
+    }
+  });
+  document.getElementById('btnCloseAboutUsModal')?.addEventListener('click', closeAboutModal);
+
+  // Location Controls
   document.getElementById('btnDetectGps')?.addEventListener('click', handleDetectGps);
   document.getElementById('btnManualLocation')?.addEventListener('click', openLocationSetupModal);
 
-  // Search & Live Suggestions
+  // Search & Live Suggestions (Debounced for 60fps Zero-Lag Speed)
   const searchInput = document.getElementById('searchInput');
   const suggestionsBox = document.getElementById('searchSuggestions');
+  let searchDebounceTimer = null;
 
   searchInput?.addEventListener('input', e => {
     searchQuery = e.target.value.trim().toLowerCase();
     renderLiveSuggestions(searchQuery);
-    renderProducts();
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      renderProducts();
+    }, 120);
   });
 
   // Hide suggestions when clicking outside
@@ -117,10 +179,11 @@ function setupEventListeners() {
   document.getElementById('btnOpenCart')?.addEventListener('click', openCart);
   document.getElementById('closeCartDrawer')?.addEventListener('click', closeCart);
 
-  // Backdrop
+  // Global Backdrop
   document.getElementById('drawerBackdrop')?.addEventListener('click', () => {
     closeCart();
     closeNotifDrawer();
+    closeMenuDrawer();
   });
 
   // PWA
@@ -143,6 +206,62 @@ function setupEventListeners() {
     markAllRead();
     renderNotificationDrawer();
   });
+}
+
+// ─── Menu Drawer Controls ─────────────────────────────────────────────────────
+function openMenuDrawer() {
+  const drawer = document.getElementById('menuDrawer');
+  const backdrop = document.getElementById('drawerBackdrop');
+  if (drawer) {
+    drawer.classList.remove('hidden');
+    // Force reflow for smooth CSS slide transition
+    void drawer.offsetWidth;
+    drawer.classList.add('open');
+  }
+  if (backdrop) backdrop.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMenuDrawer() {
+  const drawer = document.getElementById('menuDrawer');
+  const backdrop = document.getElementById('drawerBackdrop');
+  if (drawer) drawer.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('active');
+  document.body.style.overflow = '';
+  setTimeout(() => drawer?.classList.add('hidden'), 280);
+}
+
+// ─── Modal Visibility Controls ────────────────────────────────────────────────
+function openSignInModal() {
+  document.getElementById('signInModal')?.classList.add('open');
+}
+function closeSignInModal() {
+  document.getElementById('signInModal')?.classList.remove('open');
+}
+
+function openTermsModal() {
+  document.getElementById('termsModal')?.classList.add('open');
+}
+function closeTermsModal() {
+  document.getElementById('termsModal')?.classList.remove('open');
+}
+
+function openSettingsModal() {
+  const locDesc = document.getElementById('settingsLocationDesc');
+  if (locDesc) {
+    locDesc.textContent = (userLocation && userLocation.town) ? `Current: ${userLocation.town}` : 'Current: All Locations (Worldwide)';
+  }
+  document.getElementById('settingsModal')?.classList.add('open');
+}
+function closeSettingsModal() {
+  document.getElementById('settingsModal')?.classList.remove('open');
+}
+
+function openAboutModal() {
+  document.getElementById('aboutUsModal')?.classList.add('open');
+}
+function closeAboutModal() {
+  document.getElementById('aboutUsModal')?.classList.remove('open');
 }
 
 // ─── Auth Handling ────────────────────────────────────────────────────────────
@@ -191,18 +310,34 @@ function updateAuthUI(user) {
   const userAvatar = document.getElementById('userAvatar');
   const userName = document.getElementById('userName');
 
+  // Drawer menu user card elements
+  const drawerUserAvatar = document.getElementById('drawerUserAvatar');
+  const drawerUserName = document.getElementById('drawerUserName');
+  const drawerUserEmail = document.getElementById('drawerUserEmail');
+  const drawerAdminLink = document.getElementById('drawerAdminLink');
+
   if (user) {
     authBtn?.classList.add('hidden');
     userMenu?.classList.remove('hidden');
     if (userAvatar) userAvatar.src = user.photoURL || PLATFORM_CONSTANTS.BRAND_LOGO_URL;
     if (userName) userName.textContent = user.displayName ? user.displayName.split(' ')[0] : 'Account';
-    if (navAdmin) {
-      navAdmin.classList.toggle('hidden', user.email !== PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL);
-    }
+
+    if (drawerUserAvatar) drawerUserAvatar.src = user.photoURL || PLATFORM_CONSTANTS.BRAND_LOGO_URL;
+    if (drawerUserName) drawerUserName.textContent = user.displayName || 'Signed-In Shopper';
+    if (drawerUserEmail) drawerUserEmail.textContent = user.email || 'Google Account Active';
+
+    const isSupremeAdmin = user.email === PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL;
+    if (navAdmin) navAdmin.classList.toggle('hidden', !isSupremeAdmin);
+    if (drawerAdminLink) drawerAdminLink.classList.toggle('hidden', !isSupremeAdmin);
   } else {
     authBtn?.classList.remove('hidden');
     userMenu?.classList.add('hidden');
     if (navAdmin) navAdmin.classList.add('hidden');
+
+    if (drawerUserAvatar) drawerUserAvatar.src = PLATFORM_CONSTANTS.BRAND_LOGO_URL;
+    if (drawerUserName) drawerUserName.textContent = 'Welcome, Shopper!';
+    if (drawerUserEmail) drawerUserEmail.textContent = 'Sign in to track orders & save address';
+    if (drawerAdminLink) drawerAdminLink.classList.add('hidden');
   }
 }
 
@@ -212,11 +347,11 @@ async function handleDetectGps() {
   if (btn) btn.textContent = '⏳ Detecting…';
   try {
     const loc = await getCurrentGpsPosition();
-    userLocation = loc;
-    saveUserLocation(loc);
+    userLocation = { ...userLocation, ...loc };
+    saveUserLocation(userLocation);
     updateLocationUI();
     renderProducts();
-    await syncLocationToFirestore(loc);
+    await syncLocationToFirestore(userLocation);
     showToast('📍 GPS Location saved!', 'success');
   } catch (err) {
     showToast(err.message || 'Could not detect GPS location. Please enter manually.', 'warning');
@@ -228,15 +363,14 @@ async function handleDetectGps() {
 
 function updateLocationUI() {
   const el = document.getElementById('locationTownText');
-  if (!el) return;
+  const topEl = document.getElementById('topLocationText');
 
-  if (userLocation && userLocation.town && userLocation.town !== 'Location not set') {
-    el.textContent = userLocation.town;
-  } else if (userLocation && userLocation.lat != null && userLocation.lng != null) {
-    el.textContent = `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}`;
-  } else {
-    el.textContent = 'All Locations (Worldwide)';
-  }
+  const displayText = (userLocation && userLocation.town && userLocation.town !== 'Location not set')
+    ? userLocation.town
+    : ((userLocation && userLocation.lat != null) ? `${userLocation.lat.toFixed(3)}, ${userLocation.lng.toFixed(3)}` : 'Set Location');
+
+  if (topEl) topEl.textContent = displayText;
+  if (el) el.textContent = displayText === 'Set Location' ? 'All Locations (Worldwide)' : displayText;
 }
 
 async function syncLocationToFirestore(loc) {
@@ -253,39 +387,59 @@ async function syncLocationToFirestore(loc) {
 export function openLocationSetupModal() {
   document.getElementById('locationSetupModal')?.remove();
 
+  const curTown = userLocation?.town || '';
+  const curRegion = userLocation?.region || '';
+  const curStreet = userLocation?.street || '';
+  const curPhone = userLocation?.phone || currentUser?.phoneNumber || '';
+
   const modal = document.createElement('div');
   modal.id = 'locationSetupModal';
   modal.className = 'modal-overlay open';
   modal.innerHTML = `
-    <div class="modal-box" role="dialog" aria-modal="true" aria-label="Set Location">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-label="Set Location" style="max-width:500px;">
       <div class="modal-header">
-        <h3 style="font-size:1.1rem;font-weight:700;">📍 Select Your Delivery Location</h3>
+        <h3 style="font-size:1.1rem;font-weight:700;">📍 Set Your Delivery Location</h3>
         <button class="btn btn-icon" onclick="document.getElementById('locationSetupModal').remove()">✕</button>
       </div>
-      <div class="modal-body">
-        <p style="font-size:0.85rem;color:var(--slate-600);margin-bottom:1rem;line-height:1.45;">
-          Set your local location to discover neighbourhood sellers, view accurate doorstep delivery times, and get local deals.
+      <div class="modal-body" style="padding:1.1rem;">
+        <p style="font-size:0.84rem;color:var(--slate-600);margin-bottom:1rem;line-height:1.45;">
+          Capture your location to calculate exact ₹15/km delivery charges, estimated arrival times, and find nearest local merchants.
         </p>
-        <button id="modalBtnGps" class="btn btn-primary btn-block" style="margin-bottom:0.85rem;padding:0.7rem;">
-          🛰️ Use My Current GPS Location
+
+        <button id="modalBtnGps" class="btn btn-primary btn-block" style="margin-bottom:1rem;padding:0.75rem;font-size:0.9rem;border-radius:var(--radius-full);">
+          🛰️ Auto-Detect Current GPS Location
         </button>
-        <div style="text-align:center;font-size:0.75rem;color:var(--slate-400);margin-bottom:0.85rem;font-weight:700;">— OR ENTER MANUALLY —</div>
-        <div style="margin-bottom:0.85rem;">
-          <label style="font-size:0.82rem;font-weight:700;display:block;margin-bottom:0.35rem;">Area / Village / Town / Landmark *</label>
-          <input
-            id="manualTownInput"
-            type="text"
-            placeholder="e.g. Koramangala, Bengaluru or Village Name"
-            style="width:100%;padding:0.6rem 0.85rem;border:1px solid var(--slate-300);border-radius:var(--radius-md);font-size:0.85rem;"
-          />
+
+        <div style="text-align:center;font-size:0.75rem;color:var(--slate-400);margin-bottom:1rem;font-weight:700;">— OR ENTER DOORSTEP ADDRESS —</div>
+
+        <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1rem;">
+          <div>
+            <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">City / Town / Village *</label>
+            <input id="locTownInput" type="text" placeholder="e.g. Haldwani, Nainital or Village" value="${escapeHtml(curTown)}" style="width:100%;padding:0.6rem;border:1.5px solid var(--slate-300);border-radius:var(--radius-md);font-size:0.85rem;" />
+          </div>
+
+          <div>
+            <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">State / Region</label>
+            <input id="locRegionInput" type="text" placeholder="e.g. Uttarakhand, Delhi NCR, Maharashtra" value="${escapeHtml(curRegion)}" style="width:100%;padding:0.6rem;border:1.5px solid var(--slate-300);border-radius:var(--radius-md);font-size:0.85rem;" />
+          </div>
+
+          <div>
+            <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">Street / Landmark / House No. *</label>
+            <input id="locStreetInput" type="text" placeholder="e.g. Near Shiv Temple, Main Market, House #12" value="${escapeHtml(curStreet)}" style="width:100%;padding:0.6rem;border:1.5px solid var(--slate-300);border-radius:var(--radius-md);font-size:0.85rem;" />
+          </div>
+
+          <div>
+            <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">Mobile Phone Number</label>
+            <input id="locPhoneInput" type="tel" placeholder="e.g. 9876543210" value="${escapeHtml(curPhone)}" style="width:100%;padding:0.6rem;border:1.5px solid var(--slate-300);border-radius:var(--radius-md);font-size:0.85rem;" />
+          </div>
         </div>
       </div>
       <div class="modal-footer" style="display:flex;justify-content:space-between;">
         <button class="btn btn-ghost" onclick="document.getElementById('locationSetupModal').remove()">
           Browse Worldwide
         </button>
-        <button id="modalBtnSaveManual" class="btn btn-secondary">
-          Save Location
+        <button id="modalBtnSaveManual" class="btn btn-secondary" style="font-weight:700;">
+          Save Location ✓
         </button>
       </div>
     </div>
@@ -297,27 +451,40 @@ export function openLocationSetupModal() {
     if (b) b.textContent = '⏳ Detecting…';
     try {
       const loc = await getCurrentGpsPosition();
-      userLocation = loc;
-      saveUserLocation(loc);
+      userLocation = { ...userLocation, ...loc };
+      saveUserLocation(userLocation);
       updateLocationUI();
       renderProducts();
-      await syncLocationToFirestore(loc);
+      await syncLocationToFirestore(userLocation);
       showToast('📍 GPS Location saved!', 'success');
       modal.remove();
     } catch (e) {
       showToast(e.message || 'Could not detect GPS location.', 'warning');
-      if (b) b.textContent = '🛰️ Use My Current GPS Location';
+      if (b) b.textContent = '🛰️ Auto-Detect Current GPS Location';
     }
   });
 
   modal.querySelector('#modalBtnSaveManual')?.addEventListener('click', async () => {
-    const input = modal.querySelector('#manualTownInput');
-    const val = input?.value.trim();
-    if (!val) {
-      showToast('Please enter your area or landmark.', 'warning');
+    const town = modal.querySelector('#locTownInput')?.value.trim();
+    const region = modal.querySelector('#locRegionInput')?.value.trim();
+    const street = modal.querySelector('#locStreetInput')?.value.trim();
+    const phone = modal.querySelector('#locPhoneInput')?.value.trim();
+
+    if (!town) {
+      showToast('Please enter your City / Town / Village.', 'warning');
       return;
     }
-    userLocation = { town: val, lat: null, lng: null, isManual: true };
+
+    const fullAddress = `${street ? street + ', ' : ''}${town}${region ? ', ' + region : ''}`;
+    userLocation = {
+      ...(userLocation || {}),
+      town,
+      region,
+      street,
+      phone,
+      address: fullAddress,
+      isManual: true
+    };
     saveUserLocation(userLocation);
     updateLocationUI();
     renderProducts();
@@ -639,7 +806,7 @@ function buildProductCard(product) {
           ${hasDiscount ? `<span style="font-size:0.72rem;font-weight:700;color:var(--emerald-600);">${discountPct}% off</span>` : ''}
         </div>
         ${lowStock ? `<p style="font-size:0.7rem;color:var(--rose-600);font-weight:600;margin-bottom:0.35rem;">⚠️ Only ${product.stock} left!</p>` : ''}
-        <div class="product-cart-action">${cartHtml}</div>
+        <div id="cart_action_${escapeHtml(product.id)}" class="product-cart-action">${cartHtml}</div>
       </div>
     </div>
   `;
@@ -661,6 +828,12 @@ window.openProductDetailModal = function(productId) {
   const waPhone = cleanPhone ? (cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone) : PLATFORM_CONSTANTS.HELPLINE_WHATSAPP;
   const waMsg = encodeURIComponent(`Hi ${shop.name || 'Seller'}, I am interested in ordering "${product.title}" on Zulora Local.`);
   const waUrl = `https://wa.me/${waPhone}?text=${waMsg}`;
+  const sellerEmail = shop.ownerEmail || shop.email || '';
+
+  const distKm = (userLocation?.lat != null && shop.lat != null)
+    ? calculateHaversineDistance(userLocation.lat, userLocation.lng, shop.lat, shop.lng)
+    : null;
+  const eta = getEstimatedDeliveryTime(distKm);
 
   const hasDiscount = product.mrp && product.mrp > product.price;
   const discountPct = hasDiscount ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : 0;
@@ -691,10 +864,17 @@ window.openProductDetailModal = function(productId) {
           </div>
         ` : ''}
 
-        <div style="display:flex;align-items:center;gap:0.35rem;margin-bottom:0.5rem;">
-          <span style="font-size:0.82rem;font-weight:700;color:var(--azure-700);">${escapeHtml(shop.name || 'Local Seller')}</span>
+        <div style="display:flex;align-items:center;gap:0.35rem;margin-bottom:0.4rem;">
+          <span style="font-size:0.84rem;font-weight:700;color:var(--azure-700);">${escapeHtml(shop.name || 'Local Seller')}</span>
           ${isVerified ? `<img src="${PLATFORM_CONSTANTS.VERIFIED_BADGE_URL}" class="verified-badge-sm" alt="✓" />` : ''}
           <span class="badge" style="background:var(--slate-100);font-size:0.7rem;margin-left:auto;">${escapeHtml(product.category || 'General')}</span>
+        </div>
+
+        <div style="font-size:0.75rem;color:var(--azure-800);background:var(--azure-50);border:1px solid var(--azure-200);border-radius:var(--radius-sm);padding:0.4rem 0.6rem;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+          <span>📍 ${distKm != null ? `${distKm} km from you` : 'Hyperlocal Merchant'}</span>
+          <span>•</span>
+          <span>⚡ ${eta} delivery</span>
+          ${sellerEmail ? `<span>• 📧 ${escapeHtml(sellerEmail)}</span>` : ''}
         </div>
 
         <div class="product-modal-pricing">
@@ -769,18 +949,45 @@ function updateCarouselDots(carousel, activeIdx) {
 }
 
 // ─── Cart Integration ─────────────────────────────────────────────────────────
+function updateCardStepperDOM(productId) {
+  const container = document.getElementById(`cart_action_${productId}`);
+  if (!container) return;
+  const product = allProducts.find(p => p.id === productId);
+  if (!product) return;
+  const outOfStock = product.stock <= 0;
+  const cart = getCart();
+  const qty = cart[productId]?.qty || 0;
+
+  if (outOfStock) {
+    container.innerHTML = `<button class="btn-add-cart btn-out-of-stock" disabled>Out of Stock</button>`;
+  } else if (qty > 0) {
+    container.innerHTML = `
+      <div class="qty-pill">
+        <button class="qty-btn" onclick="event.stopPropagation(); window.handleCartChange('${escapeHtml(productId)}', -1)">−</button>
+        <span class="qty-count">${qty}</span>
+        <button class="qty-btn" onclick="event.stopPropagation(); window.handleCartChange('${escapeHtml(productId)}', 1)">+</button>
+      </div>
+    `;
+  } else {
+    container.innerHTML = `
+      <button class="btn-add-cart" onclick="event.stopPropagation(); window.handleCartAdd('${escapeHtml(productId)}')">🛒 Add</button>
+    `;
+  }
+}
+window.updateCardStepperDOM = updateCardStepperDOM;
+
 window.handleCartAdd = function(productId) {
   const product = allProducts.find(p => p.id === productId);
   if (!product) return;
   cartAdd(product);
   updateCartUI();
-  renderProducts();
+  updateCardStepperDOM(productId);
 };
 
 window.handleCartChange = function(productId, delta) {
   cartChangeQty(productId, delta);
   updateCartUI();
-  renderProducts();
+  updateCardStepperDOM(productId);
 };
 
 function updateCartUI() {
@@ -788,10 +995,15 @@ function updateCartUI() {
   const bar = document.getElementById('floatingCartBar');
   const countEl = document.getElementById('floatingCartCount');
   const totalEl = document.getElementById('floatingCartTotal');
+  const navCountEl = document.getElementById('navCartCount');
 
   if (bar) bar.classList.toggle('hidden', totalCount === 0);
   if (countEl) countEl.textContent = totalCount;
   if (totalEl) totalEl.textContent = totalPrice.toFixed(2);
+  if (navCountEl) {
+    navCountEl.textContent = totalCount;
+    navCountEl.style.display = totalCount > 0 ? 'inline-block' : 'none';
+  }
 }
 
 function openCart() {
@@ -831,9 +1043,12 @@ function renderCartDrawerContent() {
     return;
   }
 
-  let grandTotal = 0;
-  let shopSections = groupList.map(([shopId, group]) => {
-    grandTotal += (group.shopTotal + group.deliveryFee);
+  let totalGrand = 0;
+  let hasAnyShortfall = false;
+
+  const shopSections = groupList.map(([shopId, group]) => {
+    totalGrand += group.grandTotal;
+    if (group.isBelowMinOrder) hasAnyShortfall = true;
 
     const rows = group.items.map(item => {
       const coverImg = Array.isArray(item.product.images) && item.product.images.length > 0
@@ -860,16 +1075,40 @@ function renderCartDrawerContent() {
 
     return `
       <div style="background:var(--slate-50);border:1px solid var(--slate-200);border-radius:var(--radius-md);padding:0.85rem;margin-bottom:1rem;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;padding-bottom:0.35rem;border-bottom:1px solid var(--slate-200);">
-          <strong style="font-size:0.88rem;color:var(--slate-900);">${escapeHtml(group.shop.name || 'Local Seller')}</strong>
-          <span style="font-size:0.75rem;font-weight:700;color:var(--azure-700);">🛵 Delivery: ₹${group.deliveryFee}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;padding-bottom:0.4rem;border-bottom:1px solid var(--slate-200);">
+          <div>
+            <strong style="font-size:0.88rem;color:var(--slate-900);">${escapeHtml(group.shop.name || 'Local Seller')}</strong>
+            <span style="display:block;font-size:0.7rem;color:var(--slate-400);">Self-Delivery by merchant</span>
+          </div>
+          <span style="font-size:0.75rem;font-weight:700;color:var(--azure-700);background:var(--azure-50);padding:0.2rem 0.5rem;border-radius:var(--radius-sm);">
+            ${group.distKm ? `📍 ${group.distKm.toFixed(1)} km` : '📍 Local'}
+          </span>
         </div>
         ${rows}
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.4rem;font-size:0.82rem;">
-          <span style="color:var(--slate-500);">Items Total</span>
-          <strong>₹${group.shopTotal.toFixed(2)}</strong>
+        <div style="margin-top:0.6rem;padding-top:0.5rem;border-top:1px dashed var(--slate-200);font-size:0.8rem;display:flex;flex-direction:column;gap:0.25rem;">
+          <div style="display:flex;justify-content:space-between;color:var(--slate-600);">
+            <span>Items Subtotal</span>
+            <span>₹${group.shopTotal.toFixed(2)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;color:var(--slate-600);">
+            <span>Distance Delivery Fee (${group.distKm ? group.distKm.toFixed(1) : 1} km @ ₹15/km)</span>
+            <span>₹${(group.baseFee || 15).toFixed(2)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;color:var(--slate-600);">
+            <span>Weight Surcharge (${(group.totalWeightKg || 0).toFixed(1)} kg, first 2 kg free)</span>
+            <span>${group.weightFee > 0 ? `₹${group.weightFee.toFixed(2)}` : '<strong style="color:var(--emerald-600);">FREE</strong>'}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-weight:700;color:var(--slate-900);margin-top:0.2rem;padding-top:0.2rem;border-top:1px solid var(--slate-200);">
+            <span>Store Total</span>
+            <strong style="color:var(--azure-800);">₹${group.grandTotal.toFixed(2)}</strong>
+          </div>
         </div>
-        ${group.isBelowMinOrder ? `<div style="font-size:0.72rem;color:var(--amber-700);margin-top:0.25rem;">⚠️ Minimum order for this seller is ₹${group.minOrder}</div>` : ''}
+        ${group.isBelowMinOrder ? `
+          <div style="background:#fffbeb;border:1px solid #fef3c7;border-radius:var(--radius-sm);padding:0.4rem 0.6rem;font-size:0.73rem;color:#b45309;margin-top:0.5rem;display:flex;align-items:center;gap:0.35rem;">
+            <span>⚠️</span>
+            <span>Minimum order for this store is <strong>₹${group.minOrder}</strong>. Please add <strong>₹${group.shortfall.toFixed(2)}</strong> more.</span>
+          </div>
+        ` : ''}
       </div>
     `;
   }).join('');
@@ -877,10 +1116,15 @@ function renderCartDrawerContent() {
   body.innerHTML = shopSections;
   footer.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.85rem;font-size:1.05rem;">
-      <span>Grand Total (incl. delivery):</span>
-      <strong style="color:var(--azure-800);font-size:1.2rem;">₹${grandTotal.toFixed(2)}</strong>
+      <span style="font-weight:600;">Grand Total (incl. delivery):</span>
+      <strong style="color:var(--azure-800);font-size:1.2rem;">₹${totalGrand.toFixed(2)}</strong>
     </div>
-    <button class="btn btn-primary btn-block" onclick="window.openCheckoutModal()" style="padding:0.75rem;font-size:0.95rem;font-weight:700;border-radius:var(--radius-full);">
+    ${hasAnyShortfall ? `
+      <div style="background:#fef2f2;border:1px solid #fee2e2;border-radius:var(--radius-md);padding:0.5rem;font-size:0.75rem;color:#b91c1c;margin-bottom:0.6rem;text-align:center;">
+        ⚠️ One or more stores in your cart do not meet the ₹50 minimum order threshold.
+      </div>
+    ` : ''}
+    <button class="btn btn-primary btn-block" onclick="window.openCheckoutModal()" ${hasAnyShortfall ? 'disabled style="opacity:0.6;cursor:not-allowed;"' : ''} style="padding:0.75rem;font-size:0.95rem;font-weight:700;border-radius:var(--radius-full);">
       Proceed to Checkout →
     </button>
   `;
@@ -892,17 +1136,23 @@ window.openCheckoutModal = function() {
   document.getElementById('checkoutModal')?.remove();
 
   const groups = groupCartByShop(allShops, userLocation);
-  const grandTotal = Object.values(groups).reduce((sum, g) => sum + g.shopTotal + g.deliveryFee, 0);
+  const anyBelow = Object.values(groups).find(g => g.isBelowMinOrder);
+  if (anyBelow) {
+    showToast(`Order from "${anyBelow.shop.name || 'Store'}" is below the ₹50 minimum order value. Please add ₹${anyBelow.shortfall.toFixed(2)} more.`, 'warning');
+    return;
+  }
+
+  const grandTotal = Object.values(groups).reduce((sum, g) => sum + g.grandTotal, 0);
 
   const qrSections = Object.entries(groups).map(([shopId, group]) => {
     const shop = group.shop;
-    const shopTotal = group.shopTotal + group.deliveryFee;
+    const shopTotal = group.grandTotal;
     const upiId = shop.upiId || 'zulora@upi';
     const upiStr = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(shop.name || 'Zulora Seller')}&am=${shopTotal}&cu=INR`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiStr)}`;
     return `
-      <div style="text-align:center;padding:0.65rem;border:1px solid var(--slate-200);border-radius:var(--radius-md);margin-bottom:0.65rem;">
-        <div style="font-size:0.82rem;font-weight:700;margin-bottom:0.35rem;">${escapeHtml(shop.name || 'Seller')}</div>
+      <div style="text-align:center;padding:0.65rem;border:1px solid var(--slate-200);border-radius:var(--radius-md);margin-bottom:0.65rem;background:#ffffff;">
+        <div style="font-size:0.82rem;font-weight:700;margin-bottom:0.25rem;">${escapeHtml(shop.name || 'Seller')}</div>
         <img src="${qrUrl}" alt="UPI QR" style="width:130px;height:130px;margin:0 auto;display:block;" />
         <div style="font-size:0.75rem;color:var(--slate-600);margin-top:0.35rem;">Pay ₹${shopTotal.toFixed(2)} to <strong>${escapeHtml(upiId)}</strong></div>
       </div>
@@ -945,10 +1195,14 @@ window.openCheckoutModal = function() {
           ${qrSections}
         </div>
 
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem;background:var(--azure-50);border-radius:var(--radius-md);">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem;background:var(--azure-50);border-radius:var(--radius-md);margin-bottom:0.75rem;">
           <span style="font-size:0.85rem;color:var(--azure-900);font-weight:700;">Total Amount:</span>
           <strong style="font-size:1.1rem;color:var(--azure-800);">₹${grandTotal.toFixed(2)}</strong>
         </div>
+
+        <p style="font-size:0.73rem;color:var(--slate-500);text-align:center;margin:0;">
+          By placing an order, you agree to the <a href="#" onclick="window.openTermsModal();return false;" style="color:var(--azure-600);text-decoration:underline;">Zulora Terms & Conditions</a> and Merchant Self-Delivery Policy.
+        </p>
       </div>
       <div class="modal-footer" style="display:flex;justify-content:space-between;">
         <button class="btn btn-ghost" onclick="document.getElementById('checkoutModal').remove()">Cancel</button>
@@ -978,11 +1232,17 @@ window.executeOrderPlacement = async function() {
   if (!address) { showToast('Please enter your delivery address.', 'warning'); return; }
 
   const groups = groupCartByShop(allShops, userLocation);
+  const anyBelow = Object.values(groups).find(g => g.isBelowMinOrder);
+  if (anyBelow) {
+    showToast(`Order from "${anyBelow.shop.name || 'Store'}" is below the ₹50 minimum order value. Please add ₹${anyBelow.shortfall.toFixed(2)} more.`, 'warning');
+    return;
+  }
+
   const orderIds = [];
 
   for (const [shopId, group] of Object.entries(groups)) {
     const shop = group.shop;
-    const shopTotal = group.shopTotal + group.deliveryFee;
+    const shopTotal = group.grandTotal;
 
     const orderData = {
       orderId: 'ZUL-' + Math.floor(100000 + Math.random() * 900000),
@@ -1000,14 +1260,21 @@ window.executeOrderPlacement = async function() {
         qty: i.qty,
         quantity: i.qty,
         price: i.product.price,
-        unit: i.product.unit || ''
+        unit: i.product.unit || '',
+        weightKg: i.product.weightKg || 0.5
       })),
       itemsSubtotal: group.shopTotal,
+      baseDeliveryFee: group.baseFee,
+      weightFee: group.weightFee,
+      totalWeightKg: group.totalWeightKg,
+      distKm: group.distKm,
       deliveryFee: group.deliveryFee,
       grandTotal: shopTotal,
       totalAmount: shopTotal,
       paymentMode: payment,
       orderStatus: 'Placed',
+      buyerDeliveredConfirmed: false,
+      deliveryModel: 'Self-Delivery (Merchant)',
       createdAt: serverTimestamp()
     };
 

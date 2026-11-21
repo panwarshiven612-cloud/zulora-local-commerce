@@ -131,9 +131,14 @@ export function groupCartByShop(allShops = new Map(), userLocation = null) {
     const deliveryRules = calculateDeliveryFeeAndMinOrder(distKm, g.totalWeightKg);
     g.distKm = distKm;
     g.deliveryFee = deliveryRules.deliveryFee;
+    g.baseFee = deliveryRules.baseFee;
+    g.weightFee = deliveryRules.weightFee;
+    g.extraWeightKg = deliveryRules.extraWeightKg;
     g.minOrder = deliveryRules.minOrder;
     g.deliveryTime = deliveryRules.deliveryTime;
     g.isBelowMinOrder = g.shopTotal < g.minOrder;
+    g.shortfall = Math.max(0, g.minOrder - g.shopTotal);
+    g.grandTotal = g.shopTotal + g.deliveryFee;
   });
 
   return groups;

@@ -6,7 +6,7 @@
 
 import {
   auth, db, googleProvider, signInWithPopup, signOut, onAuthStateChanged,
-  collection, query, where, orderBy, onSnapshot, isConfigPlaceholder
+  collection, doc, updateDoc, serverTimestamp, query, where, orderBy, onSnapshot, isConfigPlaceholder
 } from './firebase-init.js';
 import { PLATFORM_CONSTANTS } from './config.js';
 import { addNotification, loadSavedNotifications, notifyOrderStatus, showToast } from './notifications.js';
@@ -193,7 +193,7 @@ function renderOrders() {
               ${order.sellerEmail ? ` • 📧 ${escapeHtml(order.sellerEmail)}` : ''}
             </div>
           </div>
-          <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+          <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
             <a href="${callUrl}" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:0.3rem;">
               📞 Call Seller
             </a>
@@ -203,6 +203,12 @@ function renderOrders() {
             <button class="btn btn-primary btn-sm" onclick='window.handleBuyAgain(${JSON.stringify(order.items || [])})'>
               🔁 Buy Again
             </button>
+            ${order.buyerDeliveredConfirmed
+              ? `<span style="background:var(--emerald-50,#ecfdf5);color:var(--emerald-700,#047857);border:1px solid var(--emerald-300,#a7f3d0);padding:0.3rem 0.65rem;border-radius:var(--radius-full);font-size:0.75rem;font-weight:700;display:inline-flex;align-items:center;gap:0.25rem;">✓ Delivery Confirmed</span>`
+              : (order.orderStatus === 'Out for Delivery' || order.orderStatus === 'Delivered')
+                ? `<button class="btn btn-sm" style="background:var(--emerald-600,#059669);color:#fff;border-radius:var(--radius-full);font-weight:700;" onclick="window.confirmOrderDelivery('${order.docId}')">✅ Confirm / Verify Delivered</button>`
+                : ''
+            }
           </div>
         </div>
 
@@ -247,6 +253,21 @@ window.handleBuyAgain = function(items) {
     setTimeout(() => window.location.href = './index.html', 500);
   } catch(e) {
     window.location.href = './index.html';
+  }
+};
+
+// ─── Customer Delivery Verification ──────────────────────────────────────────
+window.confirmOrderDelivery = async function(docId) {
+  if (!db || isConfigPlaceholder || !docId) return;
+  try {
+    await updateDoc(doc(db, 'orders', docId), {
+      orderStatus: 'Delivered',
+      buyerDeliveredConfirmed: true,
+      deliveredAt: serverTimestamp()
+    });
+    showToast('🎉 Delivery verified! Thank you for shopping on Zulora Local.', 'success');
+  } catch (err) {
+    showToast('Could not verify delivery: ' + err.message, 'error');
   }
 };
 

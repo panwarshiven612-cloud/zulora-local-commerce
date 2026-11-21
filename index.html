@@ -66,44 +66,71 @@
 <body>
 
   <!-- ═══════════════════════════════════════════════
-       NAVBAR (Blinkit-Style + Pearl & Azure Accents)
+       NAVBAR (Blinkit / Swiggy / Zomato Style)
   ═══════════════════════════════════════════════ -->
   <nav class="navbar">
-    <div class="navbar-brand">
-      <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Zulora Local Logo" class="navbar-logo" />
-      <div class="navbar-brand-text">
-        <span class="brand-name">Zulora Local</span>
-        <span class="brand-sub">by Zulora AI</span>
+    <div class="navbar-left">
+      <!-- 3-Bar Hamburger Menu Button -->
+      <button id="btnHamburgerMenu" class="btn-hamburger" aria-label="Open Navigation Menu" title="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      <!-- Brand Logo + Verified Blue Tick -->
+      <a href="./index.html" class="navbar-brand" style="text-decoration:none;">
+        <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Zulora Local" class="navbar-logo" />
+        <div class="navbar-brand-text">
+          <div style="display:flex;align-items:center;">
+            <span class="brand-name">Zulora Local</span>
+            <img src="https://i.postimg.cc/MZVr9JS2/LS20260530205459.png" alt="✓" class="verified-badge" title="Verified Hyperlocal Platform" />
+          </div>
+          <span class="brand-sub">by Zulora AI</span>
+        </div>
+      </a>
+
+      <!-- Quick Location Pill (Clickable) -->
+      <div id="topLocationPill" class="nav-location-pill" title="Click to change location">
+        <span>📍</span>
+        <span id="topLocationText">Set Location</span>
+        <span style="font-size:0.65rem;color:var(--azure-500);">▾</span>
       </div>
     </div>
 
     <div class="navbar-actions">
-      <a href="./seller.html" class="btn btn-secondary">🛒 Become a Seller / My Shop</a>
-      <a href="./orders.html" class="btn btn-ghost">📦 My Orders</a>
-      <a href="./admin.html" id="navAdminLink" class="btn btn-danger hidden">⚙️ Admin</a>
-      <button id="btnInstallApp" class="btn btn-ghost hidden">📲 Install App</button>
+      <!-- Role Switcher: Become a Seller -->
+      <a href="./seller.html" class="btn btn-secondary btn-sm">🛒 Seller Studio</a>
+      <!-- Orders link -->
+      <a href="./orders.html" class="btn btn-ghost btn-sm">📦 Orders</a>
+      <a href="./admin.html" id="navAdminLink" class="btn btn-danger btn-sm hidden">⚙️ Admin</a>
+      <button id="btnInstallApp" class="btn btn-ghost btn-sm hidden">📲 App</button>
 
       <!-- Notification Bell -->
       <button id="btnNotifBell" class="btn btn-icon" aria-label="Notifications" title="Notifications">
         🔔 <span id="notifBadge" class="hidden">0</span>
       </button>
 
-      <!-- Auth Action -->
-      <button id="authBtn" class="btn btn-primary">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="16" height="16" style="margin-right:4px;">
+      <!-- Clean Sign-In Button -->
+      <button id="authBtn" class="btn btn-primary btn-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="15" height="15" style="margin-right:3px;">
           <path fill="#4285F4" d="M24 9.5c3.1 0 5.8 1.1 8 2.9l5.9-5.9C34.4 3.5 29.5 1.5 24 1.5 14.9 1.5 7.2 7.1 4 15l6.9 5.4C12.5 13.6 17.8 9.5 24 9.5z"/>
           <path fill="#34A853" d="M46.5 24c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.4 5.7C43.4 36.9 46.5 30.9 46.5 24z"/>
           <path fill="#FBBC05" d="M10.9 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.1.8-4.6L3.4 14C1.8 17.1 1 20.5 1 24s.8 6.9 2.4 10l7.5-5.4z"/>
           <path fill="#EA4335" d="M24 46.5c5.5 0 10.1-1.8 13.5-4.9l-7.4-5.7c-1.8 1.2-4.2 1.9-6.1 1.9-6.2 0-11.5-4.1-13.1-9.9l-6.9 5.4C7.2 40.9 14.9 46.5 24 46.5z"/>
         </svg>
-        Sign in with Google
+        Sign In
       </button>
 
       <div id="userMenu" class="user-menu hidden" style="display:flex;align-items:center;gap:0.4rem;">
-        <img id="userAvatar" src="" alt="Avatar" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--azure-400);" />
-        <span id="userName" style="font-size:0.8rem;font-weight:700;"></span>
-        <button id="signOutBtn" class="btn btn-ghost btn-sm" title="Sign Out">Sign Out</button>
+        <img id="userAvatar" src="" alt="Avatar" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1.5px solid var(--azure-500);" />
+        <span id="userName" style="font-size:0.78rem;font-weight:700;"></span>
+        <button id="signOutBtn" class="btn btn-ghost btn-sm" title="Sign Out">✕</button>
       </div>
+
+      <!-- Quick Nav Cart Button -->
+      <button id="navCartBtn" class="nav-cart-btn" aria-label="Open Shopping Cart">
+        🛒 Cart <span id="navCartCount" class="badge">0</span>
+      </button>
 
       <!-- Refresh -->
       <button id="btnRefreshData" class="btn btn-icon" aria-label="Refresh Products" title="Refresh">↻</button>
@@ -273,6 +300,211 @@
       <div id="notifDrawerList" class="notif-list"></div>
     </div>
   </aside>
+
+  <!-- ═══════════════════════════════════════════════
+       3-BAR NAVIGATION MENU DRAWER (Slide-out Left)
+  ═══════════════════════════════════════════════ -->
+  <aside id="menuDrawer" class="drawer drawer-left hidden" aria-label="Main Navigation Menu" role="navigation">
+    <div class="drawer-header">
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Logo" class="navbar-logo" />
+        <span class="drawer-title">Zulora Local</span>
+      </div>
+      <button id="btnCloseMenuDrawer" class="btn btn-icon" aria-label="Close menu">✕</button>
+    </div>
+    <div class="drawer-body">
+      <!-- User profile in drawer -->
+      <div id="drawerUserCard" class="menu-user-card">
+        <img id="drawerUserAvatar" src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Avatar" class="menu-user-avatar" />
+        <div style="flex:1;overflow:hidden;">
+          <div id="drawerUserName" style="font-size:0.9rem;font-weight:800;color:var(--slate-900);text-overflow:ellipsis;overflow:hidden;white-space:nowrap;">
+            Welcome, Shopper!
+          </div>
+          <div id="drawerUserEmail" style="font-size:0.75rem;color:var(--slate-500);text-overflow:ellipsis;overflow:hidden;white-space:nowrap;">
+            Sign in to track orders & save address
+          </div>
+        </div>
+      </div>
+
+      <div class="menu-section-label">Shopping & Orders</div>
+      <ul class="menu-nav-list">
+        <li><a href="./index.html" class="menu-nav-item"><span class="menu-item-icon">🛍️</span> Buyer Storefront</a></li>
+        <li><a href="./orders.html" class="menu-nav-item"><span class="menu-item-icon">📦</span> My Orders & Live Tracker</a></li>
+        <li><a href="./seller.html" class="menu-nav-item"><span class="menu-item-icon">🏪</span> Become a Seller / My Shop</a></li>
+        <li><a href="./admin.html" id="drawerAdminLink" class="menu-nav-item hidden" style="color:var(--rose-600);"><span class="menu-item-icon">🛡️</span> Supreme Admin Panel</a></li>
+      </ul>
+
+      <div class="menu-section-label">Preferences & Information</div>
+      <ul class="menu-nav-list">
+        <li><button type="button" id="menuItemLocation" class="menu-nav-item"><span class="menu-item-icon">📍</span> Location Settings</button></li>
+        <li><button type="button" id="menuItemSettings" class="menu-nav-item"><span class="menu-item-icon">⚙️</span> App & Notification Settings</button></li>
+        <li><button type="button" id="menuItemAbout" class="menu-nav-item"><span class="menu-item-icon">ℹ️</span> About Us (Zulora AI)</button></li>
+        <li><button type="button" id="menuItemTerms" class="menu-nav-item"><span class="menu-item-icon">📜</span> Terms & Conditions</button></li>
+      </ul>
+
+      <div class="menu-section-label">Zulora Ecosystem</div>
+      <ul class="menu-nav-list">
+        <li><a href="https://zulora.in" target="_blank" rel="noopener noreferrer" class="menu-nav-item"><span class="menu-item-icon">🤖</span> Zulora AI (zulora.in) ↗</a></li>
+        <li><a href="https://drive.zulora.in" target="_blank" rel="noopener noreferrer" class="menu-nav-item"><span class="menu-item-icon">☁️</span> Zulora Cloud Drive ↗</a></li>
+        <li><a href="https://school.zulora.in" target="_blank" rel="noopener noreferrer" class="menu-nav-item"><span class="menu-item-icon">🎓</span> Zulora School Platform ↗</a></li>
+      </ul>
+
+      <div class="menu-section-label">Helpline & Support</div>
+      <ul class="menu-nav-list">
+        <li><a href="mailto:zulora.help@gmail.com" class="menu-nav-item"><span class="menu-item-icon">📧</span> zulora.help@gmail.com</a></li>
+        <li><a href="tel:+916395211325" class="menu-nav-item"><span class="menu-item-icon">📞</span> +91 6395211325</a></li>
+        <li><a href="https://wa.me/916395211325" target="_blank" rel="noopener noreferrer" class="menu-nav-item"><span class="menu-item-icon">💬</span> WhatsApp Support</a></li>
+      </ul>
+    </div>
+    <div class="drawer-footer" style="font-size:0.75rem;color:var(--slate-500);text-align:center;">
+      © 2026 Zulora AI • 100% Free Hyperlocal Platform
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════
+       CLEAN SIGN-IN MODAL
+  ═══════════════════════════════════════════════ -->
+  <div id="signInModal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Sign In">
+    <div class="modal-box" style="max-width:440px;">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Logo" class="navbar-logo" />
+          <h3 style="font-size:1.1rem;font-weight:800;color:var(--slate-900);">Sign In to Zulora Local</h3>
+        </div>
+        <button id="btnCloseSignInModal" class="btn btn-icon" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" style="text-align:center;padding:1.5rem 1.25rem;">
+        <div style="font-size:2.5rem;margin-bottom:0.4rem;">🛍️</div>
+        <h4 style="font-size:1.1rem;font-weight:800;color:var(--slate-900);margin-bottom:0.35rem;">One Account for Everything</h4>
+        <p style="font-size:0.84rem;color:var(--slate-600);line-height:1.5;margin-bottom:1.25rem;">
+          Sign in with Google to track live delivery, save your delivery address, reorder with 1-tap, or set up your own seller store.
+        </p>
+
+        <button id="modalGoogleSignInBtn" class="btn btn-block btn-lg" style="background:#fff;border:2px solid var(--azure-500);color:var(--slate-800);box-shadow:var(--shadow-sm);font-weight:700;display:flex;align-items:center;justify-content:center;gap:0.5rem;">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20" height="20">
+            <path fill="#4285F4" d="M24 9.5c3.1 0 5.8 1.1 8 2.9l5.9-5.9C34.4 3.5 29.5 1.5 24 1.5 14.9 1.5 7.2 7.1 4 15l6.9 5.4C12.5 13.6 17.8 9.5 24 9.5z"/>
+            <path fill="#34A853" d="M46.5 24c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.4 5.7C43.4 36.9 46.5 30.9 46.5 24z"/>
+            <path fill="#FBBC05" d="M10.9 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.1.8-4.6L3.4 14C1.8 17.1 1 20.5 1 24s.8 6.9 2.4 10l7.5-5.4z"/>
+            <path fill="#EA4335" d="M24 46.5c5.5 0 10.1-1.8 13.5-4.9l-7.4-5.7c-1.8 1.2-4.2 1.9-6.1 1.9-6.2 0-11.5-4.1-13.1-9.9l-6.9 5.4C7.2 40.9 14.9 46.5 24 46.5z"/>
+          </svg>
+          Sign in with Google
+        </button>
+
+        <div style="font-size:0.75rem;color:var(--slate-500);margin-top:1rem;display:flex;align-items:center;justify-content:center;gap:0.3rem;">
+          🔒 Private &amp; Secure • Zero SMS OTP passwords
+        </div>
+
+        <div style="margin-top:1.25rem;padding:0.75rem;background:var(--slate-50);border:1px solid var(--slate-200);border-radius:var(--radius-sm);text-align:left;font-size:0.72rem;color:var(--slate-600);line-height:1.4;">
+          <strong>💡 Developer / Host Notice:</strong> If you see an <code>auth/unauthorized-domain</code> notice, add this domain in your Firebase Console (Authentication &gt; Settings &gt; Authorized Domains).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       TERMS & CONDITIONS MODAL
+  ═══════════════════════════════════════════════ -->
+  <div id="termsModal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Terms and Conditions">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="modal-header">
+        <h3 style="font-size:1.1rem;font-weight:800;color:var(--slate-900);">📜 Terms & Conditions</h3>
+        <button id="btnCloseTermsModal" class="btn btn-icon" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" style="font-size:0.84rem;line-height:1.6;color:var(--slate-700);">
+        <h4 style="font-weight:800;color:var(--azure-900);margin:0 0 0.35rem;">1. Platform Overview</h4>
+        <p style="margin-bottom:0.75rem;">Zulora Local is a 100% free software platform operated by Zulora AI connecting neighbourhood merchants, farmers, and customers for direct hyperlocal delivery.</p>
+
+        <h4 style="font-weight:800;color:var(--azure-900);margin:0 0 0.35rem;">2. Self-Delivery &amp; Fulfilment Model</h4>
+        <p style="margin-bottom:0.75rem;">Sellers deliver orders directly using their own self-delivery personnel or local runners. Zulora Local does not employ riders or charge inflated buyer platform markups.</p>
+
+        <h4 style="font-weight:800;color:var(--azure-900);margin:0 0 0.35rem;">3. Minimum Order, Distance &amp; Weight Pricing</h4>
+        <p style="margin-bottom:0.75rem;">
+          • <strong>Minimum Order:</strong> ₹50 per store order.<br/>
+          • <strong>Distance Charge:</strong> ₹15 per km from store to customer location.<br/>
+          • <strong>Weight Surcharge:</strong> First 2 kg free of extra weight charge; for extra weight above 2 kg, ₹10 per km is charged for the extra weight tier.
+        </p>
+
+        <h4 style="font-weight:800;color:var(--azure-900);margin:0 0 0.35rem;">4. Seller Compliance &amp; Commission</h4>
+        <p style="margin-bottom:0.75rem;">Stores pay a 3% platform commission on delivered orders, settled bi-weekly. All listed products must be genuine and accurate. Counterfeit or hazardous items are strictly prohibited.</p>
+
+        <h4 style="font-weight:800;color:var(--azure-900);margin:0 0 0.35rem;">5. Dispute Resolution</h4>
+        <p>Inquiries and dispute claims can be addressed directly to <a href="mailto:zulora.help@gmail.com" style="color:var(--azure-600);font-weight:700;">zulora.help@gmail.com</a> or via phone/WhatsApp at <strong>+91 6395211325</strong>.</p>
+      </div>
+      <div class="modal-footer" style="display:flex;justify-content:flex-end;">
+        <button id="btnAgreeTerms" class="btn btn-primary">Understood &amp; Accept ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       SETTINGS MODAL
+  ═══════════════════════════════════════════════ -->
+  <div id="settingsModal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="modal-box" style="max-width:480px;">
+      <div class="modal-header">
+        <h3 style="font-size:1.1rem;font-weight:800;color:var(--slate-900);">⚙️ App &amp; Notification Settings</h3>
+        <button id="btnCloseSettingsModal" class="btn btn-icon" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" style="font-size:0.85rem;color:var(--slate-700);">
+        <div style="margin-bottom:1.25rem;">
+          <h4 style="font-size:0.95rem;font-weight:700;margin-bottom:0.35rem;">📍 Delivery Location</h4>
+          <p style="font-size:0.8rem;color:var(--slate-500);margin-bottom:0.5rem;" id="settingsLocationDesc">Current: All Locations (Worldwide)</p>
+          <button id="btnSettingsChangeLocation" class="btn btn-secondary btn-sm">✏️ Update Location &amp; Address</button>
+        </div>
+
+        <div style="margin-bottom:1.25rem;border-top:1px solid var(--slate-100);padding-top:1rem;">
+          <h4 style="font-size:0.95rem;font-weight:700;margin-bottom:0.35rem;">🔔 Push &amp; Order Notifications</h4>
+          <p style="font-size:0.8rem;color:var(--slate-500);margin-bottom:0.5rem;">Receive live updates when merchants accept your order and when delivery arrives.</p>
+          <button id="btnSettingsEnablePush" class="btn btn-primary btn-sm">Enable Browser Push Notifications</button>
+        </div>
+
+        <div style="border-top:1px solid var(--slate-100);padding-top:1rem;">
+          <h4 style="font-size:0.95rem;font-weight:700;margin-bottom:0.35rem;">🌐 Zulora Local Ecosystem</h4>
+          <p style="font-size:0.8rem;color:var(--slate-500);">Operating with 100% free static hosting on Vercel + Firebase Spark Plan + Cloudinary.</p>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="document.getElementById('settingsModal').classList.remove('open')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       ABOUT US MODAL
+  ═══════════════════════════════════════════════ -->
+  <div id="aboutUsModal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="About Zulora Local">
+    <div class="modal-box" style="max-width:500px;">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Logo" class="navbar-logo" />
+          <h3 style="font-size:1.1rem;font-weight:800;color:var(--slate-900);">About Zulora Local</h3>
+        </div>
+        <button id="btnCloseAboutUsModal" class="btn btn-icon" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" style="font-size:0.85rem;line-height:1.6;color:var(--slate-700);">
+        <p style="margin-bottom:0.75rem;">
+          <strong>Zulora Local</strong> is a community-first quick commerce platform developed by <strong>Zulora AI</strong>.
+        </p>
+        <p style="margin-bottom:0.75rem;">
+          Our mission is to empower neighbourhood grocery stores, sweet shops, farmers, and local merchants with zero-fee, modern commerce technology that matches the speed of major quick-commerce apps.
+        </p>
+        <div style="background:var(--azure-50);border:1px solid var(--azure-200);border-radius:var(--radius-md);padding:0.75rem;margin-bottom:0.75rem;">
+          <h4 style="font-size:0.82rem;font-weight:800;color:var(--azure-900);margin-bottom:0.25rem;">Zulora AI Ecosystem:</h4>
+          <ul style="margin-left:1rem;font-size:0.8rem;color:var(--azure-800);display:flex;flex-direction:column;gap:0.25rem;">
+            <li><a href="https://zulora.in" target="_blank" rel="noopener" style="color:var(--azure-700);font-weight:700;">Zulora AI (zulora.in)</a> — Autonomous AI systems</li>
+            <li><a href="https://drive.zulora.in" target="_blank" rel="noopener" style="color:var(--azure-700);font-weight:700;">Zulora Drive (drive.zulora.in)</a> — Cloud storage</li>
+            <li><a href="https://school.zulora.in" target="_blank" rel="noopener" style="color:var(--azure-700);font-weight:700;">Zulora School (school.zulora.in)</a> — AI education</li>
+          </ul>
+        </div>
+        <p style="font-size:0.8rem;color:var(--slate-500);">
+          Contact: <a href="mailto:zulora.help@gmail.com" style="color:var(--azure-600);font-weight:700;">zulora.help@gmail.com</a> • <strong>+91 6395211325</strong>
+        </p>
+      </div>
+      <div class="modal-footer" style="display:flex;justify-content:flex-end;">
+        <button class="btn btn-primary" onclick="document.getElementById('aboutUsModal').classList.remove('open')">Close ✓</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ═══════════════════════════════════════════════
        FLOATING CART BAR

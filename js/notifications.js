@@ -118,15 +118,25 @@ export async function requestNotificationPermission() {
   return result === 'granted';
 }
 
-export function triggerBrowserNotification(title, body, url = './') {
+export function triggerBrowserNotification(title, body, url = './', imageUrl = null) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  const n = new Notification(title, {
+  const options = {
     body,
     icon: './icons/icon-192.png',
     badge: './icons/icon-192.png',
     tag: 'zulora-' + Date.now()
-  });
+  };
+  if (imageUrl) {
+    options.image = imageUrl;
+  }
+  const n = new Notification(title, options);
   n.onclick = () => { window.open(url, '_blank'); n.close(); };
+}
+
+export function notifyDeliveryVerificationNeeded(orderId) {
+  const msg = `🛵 Order #${orderId} has arrived! Please confirm delivery receipt on Zulora Local.`;
+  addNotification(msg, 'info', './orders.html');
+  triggerBrowserNotification('Order Arrived!', msg, './orders.html');
 }
 
 // ─── Render Notification Drawer ────────────────────────────────────────────

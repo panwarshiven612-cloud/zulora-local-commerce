@@ -232,6 +232,13 @@ function populateShopForm(shop) {
     label.textContent = isOpen ? '🟢 Shop Open' : '🔴 Shop Closed';
     label.className = `shop-status-text ${isOpen ? 'status-open' : 'status-closed'}`;
   }
+
+  // Mandatory Agreements
+  const isAgreed = shop.agreementsAccepted === true;
+  ['agreePricingStock', 'agreeDeliveryHandling', 'agreePlatformCommission', 'agreeProhibitedItems'].forEach(id => {
+    const cb = document.getElementById(id);
+    if (cb) cb.checked = isAgreed;
+  });
 }
 
 async function handleToggleShopStatus(e) {
@@ -294,6 +301,16 @@ async function handleSaveShopProfile(e) {
   if (!name) { showToast('Please enter a shop name.', 'warning'); return; }
   if (!rawHandle) { showToast('Please enter a unique shop handle.', 'warning'); return; }
 
+  // Verify all 4 mandatory seller agreements
+  const agree1 = document.getElementById('agreePricingStock')?.checked;
+  const agree2 = document.getElementById('agreeDeliveryHandling')?.checked;
+  const agree3 = document.getElementById('agreePlatformCommission')?.checked;
+  const agree4 = document.getElementById('agreeProhibitedItems')?.checked;
+  if (!agree1 || !agree2 || !agree3 || !agree4) {
+    showToast('Please check and accept all 4 mandatory seller agreements to activate/save your store.', 'warning');
+    return;
+  }
+
   const handle = `@${rawHandle}`;
   const payload = {
     name,
@@ -304,6 +321,8 @@ async function handleSaveShopProfile(e) {
     category,
     description,
     deliveryRadiusKm: radius,
+    agreementsAccepted: true,
+    agreementsTimestamp: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
 
