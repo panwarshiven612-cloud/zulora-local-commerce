@@ -523,4 +523,65 @@
     grid-template-columns: 1fr;
     gap: 1.25rem;
   }
+  /* Prevent 3-col footer overflow */
+  .footer-container {
+    grid-template-columns: 1fr 1fr;
+  }
+  .footer-brand {
+    grid-column: 1 / -1;
+  }
+  .nav-location-pill {
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .navbar-left {
+    gap: 0.4rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .footer-container {
+    grid-template-columns: 1fr;
+  }
+  .footer-brand {
+    grid-column: 1;
+  }
+  .nav-location-pill span:last-child {
+    display: none;
+  }
+  .navbar-actions {
+    gap: 0.25rem;
+  }
+  .navbar-actions .btn-ghost,
+  .navbar-actions .btn-secondary {
+    display: none;
+  }
+}
+
+/* ─── Performance: Contain & GPU Composite hints ─────────────────────────── */
+.product-card {
+  contain: layout style;
+  will-change: auto;
+}
+.drawer {
+  contain: layout style paint;
+}
+.modal-overlay {
+  contain: layout style paint;
+}
+/* Prevent paint thrashing on category scroll swipe */
+.category-scroll {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+/* Touch-action on interactive buttons to prevent 300ms tap delay */
+button, a, [role="button"], .product-card, .category-pill, .menu-nav-item, .qty-btn, .btn-add-cart {
+  touch-action: manipulation;
+}
+/* Prevent body scroll bleed on iOS when drawer open */
+body.drawer-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
 }

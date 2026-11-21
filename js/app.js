@@ -245,6 +245,7 @@ function openTermsModal() {
 function closeTermsModal() {
   document.getElementById('termsModal')?.classList.remove('open');
 }
+window.openTermsModal = openTermsModal;
 
 function openSettingsModal() {
   const locDesc = document.getElementById('settingsLocationDesc');
@@ -489,7 +490,7 @@ export function openLocationSetupModal() {
     updateLocationUI();
     renderProducts();
     await syncLocationToFirestore(userLocation);
-    showToast(`📍 Location set to "${val}"`, 'success');
+    showToast(`📍 Location set to "${town}"`, 'success');
     modal.remove();
   });
 }
@@ -1147,14 +1148,27 @@ window.openCheckoutModal = function() {
   const qrSections = Object.entries(groups).map(([shopId, group]) => {
     const shop = group.shop;
     const shopTotal = group.grandTotal;
-    const upiId = shop.upiId || 'zulora@upi';
-    const upiStr = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(shop.name || 'Zulora Seller')}&am=${shopTotal}&cu=INR`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiStr)}`;
+    const upiId = shop.upiId || '';
+    const hasCustomQr = Boolean(shop.upiQrImageUrl);
+
     return `
-      <div style="text-align:center;padding:0.65rem;border:1px solid var(--slate-200);border-radius:var(--radius-md);margin-bottom:0.65rem;background:#ffffff;">
-        <div style="font-size:0.82rem;font-weight:700;margin-bottom:0.25rem;">${escapeHtml(shop.name || 'Seller')}</div>
-        <img src="${qrUrl}" alt="UPI QR" style="width:130px;height:130px;margin:0 auto;display:block;" />
-        <div style="font-size:0.75rem;color:var(--slate-600);margin-top:0.35rem;">Pay ₹${shopTotal.toFixed(2)} to <strong>${escapeHtml(upiId)}</strong></div>
+      <div style="text-align:center;padding:0.75rem;border:1px solid var(--slate-200);border-radius:var(--radius-md);margin-bottom:0.65rem;background:#ffffff;">
+        <div style="font-size:0.82rem;font-weight:700;margin-bottom:0.35rem;color:var(--slate-900);">${escapeHtml(shop.name || 'Seller')}</div>
+        <div style="font-size:1rem;font-weight:800;color:var(--azure-800);margin-bottom:0.25rem;">₹${shopTotal.toFixed(2)}</div>
+        ${hasCustomQr
+          ? `<img src="${escapeHtml(shop.upiQrImageUrl)}" alt="UPI QR Code" style="width:140px;height:140px;margin:0.5rem auto;display:block;border-radius:var(--radius-sm);border:1px solid var(--slate-200);" />`
+          : ''
+        }
+        ${upiId
+          ? `<div style="margin-top:0.5rem;">
+               <div style="font-size:0.75rem;color:var(--slate-500);margin-bottom:0.3rem;">UPI ID to pay:</div>
+               <div style="display:inline-flex;align-items:center;gap:0.4rem;background:var(--slate-50);border:1.5px solid var(--azure-200);border-radius:var(--radius-md);padding:0.4rem 0.75rem;">
+                 <span style="font-size:0.9rem;font-weight:700;color:var(--azure-800);font-family:monospace;">${escapeHtml(upiId)}</span>
+                 <button onclick="navigator.clipboard.writeText('${escapeHtml(upiId)}').then(()=>{ const t=document.createElement('div'); t.style.cssText='position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);background:#0284C7;color:#fff;padding:0.5rem 1rem;border-radius:9999px;font-size:0.8rem;font-weight:700;z-index:9999;'; t.textContent='✓ UPI ID copied!'; document.body.appendChild(t); setTimeout(()=>t.remove(),1800); })" style="background:none;border:none;cursor:pointer;font-size:0.85rem;" title="Copy UPI ID">📋</button>
+               </div>
+             </div>`
+          : `<div style="font-size:0.8rem;color:var(--slate-500);margin-top:0.4rem;">Contact seller for UPI payment details.</div>`
+        }
       </div>
     `;
   }).join('');
@@ -1190,7 +1204,7 @@ window.openCheckoutModal = function() {
 
         <div id="upiQrSection" style="margin-bottom:0.85rem;">
           <p style="font-size:0.75rem;color:var(--slate-500);margin-bottom:0.4rem;">
-            Scan QR code to pay seller directly:
+            Pay directly to seller via UPI:
           </p>
           ${qrSections}
         </div>
@@ -1275,6 +1289,7 @@ window.executeOrderPlacement = async function() {
       orderStatus: 'Placed',
       buyerDeliveredConfirmed: false,
       deliveryModel: 'Self-Delivery (Merchant)',
+      cancelableUntil: Date.now() + 5 * 60 * 1000,
       createdAt: serverTimestamp()
     };
 

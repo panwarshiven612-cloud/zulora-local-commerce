@@ -6,7 +6,7 @@
 
 import {
   auth, db, googleProvider, signInWithPopup, signOut, onAuthStateChanged,
-  collection, doc, updateDoc, serverTimestamp, query, where, orderBy, onSnapshot, isConfigPlaceholder
+  collection, doc, getDoc, updateDoc, serverTimestamp, query, where, orderBy, onSnapshot, isConfigPlaceholder
 } from './firebase-init.js';
 import { PLATFORM_CONSTANTS } from './config.js';
 import { addNotification, loadSavedNotifications, notifyOrderStatus, showToast } from './notifications.js';
@@ -200,6 +200,9 @@ function renderOrders() {
             <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="display:inline-flex;align-items:center;gap:0.3rem;">
               💬 WhatsApp
             </a>
+            ${(order.orderStatus === 'Placed' && Date.now() < (order.cancelableUntil || (order.createdAt?.seconds ? order.createdAt.seconds * 1000 + 5*60*1000 : Date.now())))
+              ? `<button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:var(--radius-full);font-weight:700;" onclick="window.cancelOrder('${order.docId}')">✕ Cancel Order</button>`
+              : ''}
             <button class="btn btn-primary btn-sm" onclick='window.handleBuyAgain(${JSON.stringify(order.items || [])})'>
               🔁 Buy Again
             </button>
@@ -268,6 +271,31 @@ window.confirmOrderDelivery = async function(docId) {
     showToast('🎉 Delivery verified! Thank you for shopping on Zulora Local.', 'success');
   } catch (err) {
     showToast('Could not verify delivery: ' + err.message, 'error');
+  }
+};
+
+// ─── 5-Minute Order Cancellation ─────────────────────────────────────────────
+window.cancelOrder = async function(docId) {
+  if (!db || isConfigPlaceholder || !docId) return;
+  if (!confirm('Are you sure you want to cancel this order?')) return;
+  try {
+    const orderRef = doc(db, 'orders', docId);
+    const snap = await getDoc(orderRef);
+    if (!snap.exists()) { showToast('Order not found.', 'error'); return; }
+    const data = snap.data();
+    const cancelableUntil = data.cancelableUntil || (data.createdAt?.seconds ? data.createdAt.seconds * 1000 + 5*60*1000 : 0);
+    if (Date.now() > cancelableUntil) {
+      showToast('The 5-minute cancellation window has passed. Contact the seller directly.', 'warning');
+      return;
+    }
+    if (data.orderStatus !== 'Placed') {
+      showToast('Order cannot be cancelled — it has already been accepted by the seller.', 'warning');
+      return;
+    }
+    await updateDoc(orderRef, { orderStatus: 'Cancelled', cancelledAt: serverTimestamp() });
+    showToast('Order cancelled successfully.', 'success');
+  } catch(err) {
+    showToast('Could not cancel order: ' + err.message, 'error');
   }
 };
 
