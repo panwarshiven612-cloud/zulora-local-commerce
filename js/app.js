@@ -111,7 +111,26 @@ function setupEventListeners() {
     closeSignInModal();
     await handleSignInAction();
   });
-  document.getElementById('signOutBtn')?.addEventListener('click', handleSignOutAction);
+  // Account Modal & Safe Sign-Out
+  document.getElementById('btnUserAccount')?.addEventListener('click', openAccountModal);
+  document.getElementById('btnCloseAccountModal')?.addEventListener('click', closeAccountModal);
+  document.getElementById('modalAccountSignOutBtn')?.addEventListener('click', async () => {
+    closeAccountModal();
+    await handleSignOutAction();
+  });
+  document.getElementById('btnAccountChangeLocation')?.addEventListener('click', () => {
+    closeAccountModal();
+    openLocationSetupModal({
+      currentLocation: userLocation,
+      currentUser,
+      db,
+      isConfigPlaceholder,
+      onLocationSaved: handleLocationSaved
+    });
+  });
+  document.getElementById('userAccountModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'userAccountModal') closeAccountModal();
+  });
 
   // Informational Modals
   document.getElementById('btnCloseTermsModal')?.addEventListener('click', closeTermsModal);
@@ -376,12 +395,24 @@ async function handleUserAuthChange(user) {
   }
 }
 
+function openAccountModal() {
+  document.getElementById('userAccountModal')?.classList.add('open');
+}
+
+function closeAccountModal() {
+  document.getElementById('userAccountModal')?.classList.remove('open');
+}
+
 function updateAuthUI(user) {
   const authBtn = document.getElementById('authBtn');
   const userMenu = document.getElementById('userMenu');
   const navAdmin = document.getElementById('navAdminLink');
   const userAvatar = document.getElementById('userAvatar');
   const userName = document.getElementById('userName');
+
+  const modalAccountAvatar = document.getElementById('modalAccountAvatar');
+  const modalAccountName = document.getElementById('modalAccountName');
+  const modalAccountEmail = document.getElementById('modalAccountEmail');
 
   const drawerUserAvatar = document.getElementById('drawerUserAvatar');
   const drawerUserName = document.getElementById('drawerUserName');
@@ -394,6 +425,10 @@ function updateAuthUI(user) {
     if (userAvatar) userAvatar.src = user.photoURL || PLATFORM_CONSTANTS.BRAND_LOGO_URL;
     if (userName) userName.textContent = user.displayName ? user.displayName.split(' ')[0] : 'Account';
 
+    if (modalAccountAvatar) modalAccountAvatar.src = user.photoURL || PLATFORM_CONSTANTS.BRAND_LOGO_URL;
+    if (modalAccountName) modalAccountName.textContent = user.displayName || 'Shopper Account';
+    if (modalAccountEmail) modalAccountEmail.textContent = user.email || '';
+
     if (drawerUserAvatar) drawerUserAvatar.src = user.photoURL || PLATFORM_CONSTANTS.BRAND_LOGO_URL;
     if (drawerUserName) drawerUserName.textContent = user.displayName || 'Signed-In Shopper';
     if (drawerUserEmail) drawerUserEmail.textContent = user.email || 'Google Account Active';
@@ -404,7 +439,12 @@ function updateAuthUI(user) {
   } else {
     authBtn?.classList.remove('hidden');
     userMenu?.classList.add('hidden');
+    closeAccountModal();
     if (navAdmin) navAdmin.classList.add('hidden');
+
+    if (modalAccountAvatar) modalAccountAvatar.src = PLATFORM_CONSTANTS.BRAND_LOGO_URL;
+    if (modalAccountName) modalAccountName.textContent = 'Shopper Account';
+    if (modalAccountEmail) modalAccountEmail.textContent = '';
 
     if (drawerUserAvatar) drawerUserAvatar.src = PLATFORM_CONSTANTS.BRAND_LOGO_URL;
     if (drawerUserName) drawerUserName.textContent = 'Welcome, Shopper!';

@@ -79,11 +79,13 @@ function initAdminAuth() {
 }
 
 function showGate() {
+  document.getElementById('adminLoadingState')?.classList.add('hidden');
   adminAuthGate?.classList.remove('hidden');
   adminDashboard?.classList.add('hidden');
 }
 
 function grantAdminAccess(email) {
+  document.getElementById('adminLoadingState')?.classList.add('hidden');
   adminAuthGate?.classList.add('hidden');
   adminDashboard?.classList.remove('hidden');
   if (adminEmailDisp) adminEmailDisp.textContent = email;

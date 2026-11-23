@@ -7,7 +7,9 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence
 } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import {
   getFirestore,
@@ -44,10 +46,17 @@ try {
   if (!isConfigPlaceholder) {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
+    try {
+      setPersistence(auth, browserLocalPersistence).catch(err => {
+        console.warn('[Zulora Auth] Persistence notice:', err);
+      });
+    } catch (e) {
+      console.warn('[Zulora Auth] Persistence setup error:', e);
+    }
     db = getFirestore(app);
     googleProvider = new GoogleAuthProvider();
     googleProvider.setCustomParameters({ prompt: 'select_account' });
-    console.log('[Zulora] Firebase v10 initialized:', firebaseConfig.projectId);
+    console.log('[Zulora] Firebase v10 initialized with local persistence:', firebaseConfig.projectId);
   } else {
     console.warn('[Zulora] Demo mode: placeholder config detected.');
   }
@@ -58,6 +67,7 @@ try {
 export {
   app, auth, db, googleProvider,
   GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+  setPersistence, browserLocalPersistence,
   collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
   query, where, orderBy, limit, onSnapshot, serverTimestamp, increment,
   arrayUnion, arrayRemove, Timestamp

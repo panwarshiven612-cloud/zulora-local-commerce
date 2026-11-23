@@ -310,9 +310,18 @@
   </nav>
 
   <!-- ═══════════════════════════════════════════════
+       AUTH CONNECTING / LOADING STATE
+  ═══════════════════════════════════════════════ -->
+  <div id="authConnectingState" style="text-align:center;padding:5rem 1rem;color:var(--slate-500);">
+    <div style="font-size:2.2rem;margin-bottom:0.75rem;display:inline-block;animation:spin 1s linear infinite;">⏳</div>
+    <p style="font-size:1.05rem;font-weight:700;color:var(--slate-800);margin-bottom:0.25rem;">Connecting to Seller Studio…</p>
+    <p style="font-size:0.8rem;color:var(--slate-400);">Restoring verified session from Firebase</p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
        AUTH GATE
   ═══════════════════════════════════════════════ -->
-  <section id="authSection" class="auth-gate">
+  <section id="authSection" class="auth-gate hidden">
     <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Zulora" class="auth-gate-logo" />
     <h1>🛒 Seller / Merchant Mode</h1>
     <p>Sign in with your Google account to activate your seller dashboard, manage products, and receive live orders from buyers near you.</p>

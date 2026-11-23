@@ -35,8 +35,14 @@
   <!-- ═══════════════ MAIN ═══════════════ -->
   <main class="main-content" style="max-width:1240px;padding-top:1.5rem;">
 
+    <!-- Admin Loading State -->
+    <div id="adminLoadingState" style="text-align:center;padding:4rem 1rem;color:var(--slate-500);">
+      <div style="font-size:2.2rem;margin-bottom:0.75rem;display:inline-block;animation:spin 1s linear infinite;">⏳</div>
+      <p style="font-size:1rem;font-weight:700;color:var(--slate-800);">Verifying Supreme Admin Session…</p>
+    </div>
+
     <!-- Auth Gate -->
-    <div id="adminAuthGate" class="glass-card" style="text-align:center;padding:3.5rem 1.5rem;max-width:520px;margin:3rem auto;border:1.5px solid var(--rose-300);">
+    <div id="adminAuthGate" class="glass-card hidden" style="text-align:center;padding:3.5rem 1.5rem;max-width:520px;margin:3rem auto;border:1.5px solid var(--rose-300);">
       <div style="font-size:3.5rem;margin-bottom:.5rem;">🛡️</div>
       <h2 style="font-size:1.4rem;color:var(--slate-900);margin-bottom:.5rem;">Supreme Admin Authentication</h2>
       <p style="font-size:.85rem;color:var(--slate-600);margin-bottom:1.5rem;">

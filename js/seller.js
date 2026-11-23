@@ -131,6 +131,7 @@ async function handleSellerLogout() {
 }
 
 function showDashboard(user) {
+  document.getElementById('authConnectingState')?.classList.add('hidden');
   document.getElementById('authSection')?.classList.add('hidden');
   const dash = document.getElementById('dashboardSection');
   if (dash) { dash.style.display = 'block'; }
@@ -140,6 +141,7 @@ function showDashboard(user) {
 }
 
 function showAuthGate() {
+  document.getElementById('authConnectingState')?.classList.add('hidden');
   document.getElementById('authSection')?.classList.remove('hidden');
   const dash = document.getElementById('dashboardSection');
   if (dash) { dash.style.display = 'none'; }
@@ -510,19 +512,22 @@ async function handleUploadProduct(e) {
 // ─── Real Products Listener ───────────────────────────────────────────────────
 function listenToSellerProducts(sellerUid) {
   if (unsubscribeProducts) unsubscribeProducts();
-  if (!db || isConfigPlaceholder) return;
+  if (!db || isConfigPlaceholder || !sellerUid) return;
 
+  // Single-field where query without orderBy prevents Firestore composite index error
   const q = query(
     collection(db, 'products'),
-    where('sellerUid', '==', sellerUid),
-    orderBy('createdAt', 'desc')
+    where('sellerUid', '==', sellerUid)
   );
 
   unsubscribeProducts = onSnapshot(q, (snapshot) => {
-    sellerProducts = [];
+    const prods = [];
     snapshot.forEach((d) => {
-      sellerProducts.push({ id: d.id, ...d.data() });
+      prods.push({ id: d.id, ...d.data() });
     });
+    // In-memory sort by createdAt descending
+    prods.sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a));
+    sellerProducts = prods;
     renderSellerProducts();
     updateDashboardStats();
   }, (err) => {

@@ -110,8 +110,8 @@
         🔔 <span id="notifBadge" class="hidden">0</span>
       </button>
 
-      <!-- Clean Sign-In Button -->
-      <button id="authBtn" class="btn btn-primary btn-sm">
+      <!-- Clean Sign-In Button (hidden by default to prevent flash on reload) -->
+      <button id="authBtn" class="btn btn-primary btn-sm hidden">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="15" height="15" style="margin-right:3px;">
           <path fill="#4285F4" d="M24 9.5c3.1 0 5.8 1.1 8 2.9l5.9-5.9C34.4 3.5 29.5 1.5 24 1.5 14.9 1.5 7.2 7.1 4 15l6.9 5.4C12.5 13.6 17.8 9.5 24 9.5z"/>
           <path fill="#34A853" d="M46.5 24c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.4 5.7C43.4 36.9 46.5 30.9 46.5 24z"/>
@@ -121,10 +121,13 @@
         Sign In
       </button>
 
-      <div id="userMenu" class="user-menu hidden" style="display:flex;align-items:center;gap:0.4rem;">
-        <img id="userAvatar" src="" alt="Avatar" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1.5px solid var(--azure-500);" />
-        <span id="userName" style="font-size:0.78rem;font-weight:700;"></span>
-        <button id="signOutBtn" class="btn btn-ghost btn-sm" title="Sign Out">✕</button>
+      <!-- Safe Account Pill Button (Clicking opens Account Modal, NEVER accidental logout) -->
+      <div id="userMenu" class="user-menu hidden" style="display:flex;align-items:center;">
+        <button id="btnUserAccount" class="nav-account-btn" aria-label="Open Account Menu" style="display:flex;align-items:center;gap:0.45rem;padding:0.25rem 0.65rem;border-radius:var(--radius-full);border:1.5px solid var(--azure-200);background:var(--pearl-glass);cursor:pointer;transition:all var(--transition-fast);">
+          <img id="userAvatar" src="" alt="Avatar" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:1.5px solid var(--azure-500);" />
+          <span id="userName" style="font-size:0.78rem;font-weight:700;color:var(--slate-800);max-width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+          <span style="font-size:0.65rem;color:var(--slate-400);">▾</span>
+        </button>
       </div>
 
       <!-- Quick Nav Cart Button -->
@@ -487,6 +490,65 @@
       </div>
       <div class="modal-footer" style="display:flex;justify-content:flex-end;">
         <button class="btn btn-primary" onclick="document.getElementById('aboutUsModal').classList.remove('open')">Close ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       USER ACCOUNT MODAL (Safe Account Info & Logout)
+  ═══════════════════════════════════════════════ -->
+  <div id="userAccountModal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="My Account">
+    <div class="modal-box" style="max-width:420px;border-radius:var(--radius-xl);overflow:hidden;">
+      <div class="modal-header" style="background:var(--slate-50);border-bottom:1px solid var(--slate-200);padding:1rem 1.25rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+          <img id="modalAccountAvatar" src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="User Avatar" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid var(--azure-500);box-shadow:var(--shadow-sm);" />
+          <div>
+            <div id="modalAccountName" style="font-size:1rem;font-weight:700;color:var(--slate-900);">Shopper Account</div>
+            <div id="modalAccountEmail" style="font-size:0.78rem;color:var(--slate-500);">shopper@example.com</div>
+          </div>
+        </div>
+        <button id="btnCloseAccountModal" class="btn btn-icon" aria-label="Close Account Menu" style="font-size:1.1rem;cursor:pointer;">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding:1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
+        <!-- Quick Links -->
+        <a href="./orders.html" class="account-menu-link" style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 1rem;background:var(--azure-50);border:1px solid var(--azure-200);border-radius:var(--radius-lg);text-decoration:none;color:var(--azure-900);font-weight:600;font-size:0.9rem;transition:all 0.2s;">
+          <div style="display:flex;align-items:center;gap:0.6rem;">
+            <span style="font-size:1.25rem;">📦</span>
+            <div>
+              <div>My Orders & Live Tracker</div>
+              <div style="font-size:0.72rem;font-weight:400;color:var(--slate-500);">Status, direct seller calls & receipts</div>
+            </div>
+          </div>
+          <span style="font-size:0.9rem;color:var(--azure-600);">➔</span>
+        </a>
+
+        <a href="./seller.html" class="account-menu-link" style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 1rem;background:var(--emerald-50);border:1px solid var(--emerald-200);border-radius:var(--radius-lg);text-decoration:none;color:var(--emerald-900);font-weight:600;font-size:0.9rem;transition:all 0.2s;">
+          <div style="display:flex;align-items:center;gap:0.6rem;">
+            <span style="font-size:1.25rem;">🏪</span>
+            <div>
+              <div>Seller Studio</div>
+              <div style="font-size:0.72rem;font-weight:400;color:var(--slate-500);">Manage shop, products & orders</div>
+            </div>
+          </div>
+          <span style="font-size:0.9rem;color:var(--emerald-600);">➔</span>
+        </a>
+
+        <!-- Location shortcut -->
+        <button id="btnAccountChangeLocation" class="btn btn-ghost" style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1rem;border:1px solid var(--slate-200);border-radius:var(--radius-lg);text-align:left;cursor:pointer;width:100%;">
+          <div style="display:flex;align-items:center;gap:0.6rem;">
+            <span style="font-size:1.1rem;">📍</span>
+            <div style="font-size:0.84rem;color:var(--slate-700);font-weight:600;">Change Delivery Location</div>
+          </div>
+          <span style="font-size:0.8rem;color:var(--slate-400);">Edit</span>
+        </button>
+
+        <div style="border-top:1px solid var(--slate-200);margin-top:0.5rem;padding-top:0.75rem;">
+          <!-- Prominent Confirmed Sign Out Button -->
+          <button id="modalAccountSignOutBtn" class="btn btn-block" style="background:var(--rose-50);border:1.5px solid var(--rose-200);color:var(--rose-700);font-weight:700;padding:0.75rem;border-radius:var(--radius-lg);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.5rem;transition:all 0.2s;">
+            🚪 Sign Out of Zulora
+          </button>
+        </div>
       </div>
     </div>
   </div>
