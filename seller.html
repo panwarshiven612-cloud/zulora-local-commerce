@@ -286,6 +286,37 @@
       .seller-topbar { flex-direction: column; align-items: flex-start; }
       .form-grid { grid-template-columns: 1fr; }
     }
+
+    /* Order filter pills & activity feed */
+    .order-filter-pill {
+      font-size: 0.76rem !important;
+      padding: 0.28rem 0.65rem !important;
+      border-radius: var(--radius-full) !important;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      background: var(--slate-100);
+      color: var(--slate-700);
+      border: 1px solid var(--slate-300);
+    }
+    .order-filter-pill:hover {
+      background: var(--slate-200);
+    }
+    .order-filter-pill.active {
+      background: var(--azure-600) !important;
+      color: #fff !important;
+      border-color: var(--azure-600) !important;
+      font-weight: 700;
+    }
+    .activity-feed-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.45rem 0.65rem;
+      background: #fff;
+      border: 1px solid var(--slate-200);
+      border-radius: var(--radius-sm);
+      font-size: 0.78rem;
+    }
   </style>
 </head>
 <body>
@@ -362,28 +393,163 @@
       </div>
     </div>
 
-    <!-- KPI STATS GRID -->
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">💰 Total GMV</div>
-        <div class="kpi-value azure" id="statTotalSales">₹0</div>
+    <!-- ═══════════════════════════════════════════════
+         1. DEDICATED ANALYTICAL DASHBOARD (LIVE FIREBASE)
+    ═══════════════════════════════════════════════ -->
+    <div class="seller-card" id="analyticsDashboardSection">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;border-bottom:1px solid var(--slate-200);padding-bottom:0.75rem;">
+        <div>
+          <div class="seller-card-title" style="margin-bottom:0.2rem;display:flex;align-items:center;gap:0.5rem;">
+            <span>📊</span> Analytical Dashboard &amp; Store Performance
+            <span class="live-dot" title="Live Firestore real-time connection"></span>
+          </div>
+          <p class="text-sm" style="margin:0;">Real-time metrics computed continuously from live Firestore orders and active product inventory</p>
+        </div>
+        <div style="font-size:0.75rem;color:var(--azure-700);background:var(--azure-50);padding:0.35rem 0.75rem;border-radius:var(--radius-full);font-weight:700;">
+          ⚡ Live Firestore Data
+        </div>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-label">📦 Total Orders</div>
-        <div class="kpi-value emerald" id="statTotalOrders">0</div>
+
+      <!-- KPI STATS GRID (11 Cards) -->
+      <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));gap:0.75rem;margin-bottom:1.5rem;">
+        <div class="kpi-card" style="border-left:4px solid var(--azure-600);">
+          <div class="kpi-label">💰 Total GMV</div>
+          <div class="kpi-value azure" id="statTotalSales">₹0</div>
+          <div style="font-size:0.7rem;color:var(--slate-500);margin-top:0.2rem;">All orders placed</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid var(--emerald-600);">
+          <div class="kpi-label">✅ Completed Revenue</div>
+          <div class="kpi-value emerald" id="statDeliveredRevenue">₹0</div>
+          <div style="font-size:0.7rem;color:var(--slate-500);margin-top:0.2rem;">Delivered orders revenue</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid #6366f1;">
+          <div class="kpi-label">📦 Total Orders</div>
+          <div class="kpi-value" id="statTotalOrders" style="color:#6366f1;">0</div>
+          <div style="font-size:0.7rem;color:var(--slate-500);margin-top:0.2rem;">Lifetime orders</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid var(--amber-500);">
+          <div class="kpi-label">⏳ Pending Orders</div>
+          <div class="kpi-value amber" id="statPendingOrders">0</div>
+          <div style="font-size:0.7rem;color:var(--slate-500);margin-top:0.2rem;">Awaiting confirmation</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid var(--emerald-500);">
+          <div class="kpi-label">🤝 Confirmed Orders</div>
+          <div class="kpi-value emerald" id="statConfirmedOrders">0</div>
+          <div style="font-size:0.7rem;color:var(--slate-500);margin-top:0.2rem;">Merchant approved</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid #0284c7;">
+          <div class="kpi-label">🛵 Out for Delivery</div>
+          <div class="kpi-value azure" id="statOutForDeliveryOrders">0</div>
+          <div style="font-size:0.7rem;color:var(--slate-500);margin-top:0.2rem;">In transit</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid var(--emerald-700);">
+          <div class="kpi-label">🎉 Delivered Orders</div>
+          <div class="kpi-value emerald" id="statDeliveredOrders">0</div>
+          <div style="font-size:0.7rem;color:var(--slate-500);margin-top:0.2rem;">Successfully fulfilled</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid var(--rose-500);">
+          <div class="kpi-label">✕ Cancelled Orders</div>
+          <div class="kpi-value" id="statCancelledOrders" style="color:var(--rose-600);">0</div>
+          <div style="font-size:0.7rem;color:var(--slate-500);margin-top:0.2rem;">Cancelled / Rejected</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid #10b981;">
+          <div class="kpi-label">🏷️ Active Products</div>
+          <div class="kpi-value emerald" id="statActiveProducts">0</div>
+          <div style="font-size:0.7rem;color:var(--slate-500);margin-top:0.2rem;">In-stock &amp; visible</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid var(--rose-600);">
+          <div class="kpi-label">⚠️ Low / Out of Stock</div>
+          <div class="kpi-value" id="statLowStockCount" style="color:var(--rose-600);">0</div>
+          <div style="font-size:0.7rem;color:var(--slate-500);margin-top:0.2rem;">Stock &le; 5 or empty</div>
+        </div>
+        <div class="kpi-card" style="border-left:4px solid var(--amber-600);">
+          <div class="kpi-label">📊 Commission (3%)</div>
+          <div class="kpi-value amber" id="statCommissionOwed">₹0</div>
+          <div style="font-size:0.7rem;color:var(--slate-500);margin-top:0.2rem;">Estimated platform fee</div>
+        </div>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-label">🏷️ Active Products</div>
-        <div class="kpi-value" id="statActiveProducts">0</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">📊 Commission Owed (3%)</div>
-        <div class="kpi-value amber" id="statCommissionOwed">₹0</div>
+
+      <!-- PRODUCT PERFORMANCE BREAKDOWN & RECENT ORDER ACTIVITY -->
+      <div style="display:grid;grid-template-columns:1fr;gap:1.25rem;">
+        <!-- Product Performance Breakdown Table -->
+        <div style="background:var(--slate-50);border:1px solid var(--slate-200);border-radius:var(--radius-md);padding:1rem;">
+          <div style="font-size:0.95rem;font-weight:800;color:var(--slate-900);margin-bottom:0.75rem;display:flex;align-items:center;gap:0.4rem;">
+            <span>📈</span> Product Performance Breakdown (Sales &amp; Revenue)
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="products-table" style="background:#fff;border-radius:var(--radius-sm);">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Category</th>
+                  <th>Selling Price</th>
+                  <th>Units Sold</th>
+                  <th>Est. Revenue</th>
+                  <th>Stock Left</th>
+                  <th>Status</th>
+                  <th>Listing Age</th>
+                </tr>
+              </thead>
+              <tbody id="analyticsProductTableBody">
+                <tr><td colspan="8" style="text-align:center;padding:1.5rem;color:var(--slate-400);">No products uploaded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Recent Order Activity Stream -->
+        <div style="background:var(--slate-50);border:1px solid var(--slate-200);border-radius:var(--radius-md);padding:1rem;">
+          <div style="font-size:0.95rem;font-weight:800;color:var(--slate-900);margin-bottom:0.75rem;display:flex;align-items:center;gap:0.4rem;">
+            <span>⚡</span> Recent Order Activity Feed
+          </div>
+          <div id="recentActivityFeed" style="display:flex;flex-direction:column;gap:0.5rem;max-height:220px;overflow-y:auto;">
+            <div style="text-align:center;padding:1rem;color:var(--slate-400);font-size:0.85rem;">No recent order activity recorded.</div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- ─── PRODUCT UPLOAD FORM ─── -->
-    <div class="seller-card">
+    <!-- ═══════════════════════════════════════════════
+         2. DEDICATED SELLER ORDERS & MERCHANT CONFIRMATION (SELLER-ONLY)
+    ═══════════════════════════════════════════════ -->
+    <div class="seller-card" id="sellerOrdersSection">
+      <div class="live-orders-header" style="justify-content:space-between;flex-wrap:wrap;border-bottom:1px solid var(--slate-200);padding-bottom:0.75rem;">
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <div class="live-dot"></div>
+          <div>
+            <div class="seller-card-title" style="margin-bottom:0;">🛵 Seller Orders &amp; Merchant Confirmation</div>
+            <p class="text-sm" style="margin:0;">Incoming customer orders with direct 1-tap Confirm, Out for Delivery, Mark Delivered, or Cancel actions</p>
+          </div>
+        </div>
+        <!-- Filter pills -->
+        <div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin-top:0.4rem;" id="orderFilterPills">
+          <button type="button" class="order-filter-pill active" data-filter="all">All (<span id="countFilterAll">0</span>)</button>
+          <button type="button" class="order-filter-pill" data-filter="placed">⏳ Placed (<span id="countFilterPlaced">0</span>)</button>
+          <button type="button" class="order-filter-pill" data-filter="confirmed">✅ Confirmed (<span id="countFilterConfirmed">0</span>)</button>
+          <button type="button" class="order-filter-pill" data-filter="out_for_delivery">🛵 Out for Delivery (<span id="countFilterOut">0</span>)</button>
+          <button type="button" class="order-filter-pill" data-filter="delivered">🎉 Delivered (<span id="countFilterDelivered">0</span>)</button>
+          <button type="button" class="order-filter-pill" data-filter="cancelled">✕ Cancelled (<span id="countFilterCancelled">0</span>)</button>
+        </div>
+      </div>
+
+      <!-- Seller eligibility guard banner -->
+      <div id="sellerEligibilityBanner" class="hidden" style="background:var(--amber-50);border:1.5px solid var(--amber-300);border-radius:var(--radius-md);padding:1rem;margin:1rem 0;text-align:center;">
+        <div style="font-size:1.5rem;margin-bottom:0.25rem;">🏪</div>
+        <div style="font-weight:800;color:var(--amber-900);font-size:0.95rem;">Seller Profile Incomplete</div>
+        <p style="font-size:0.82rem;color:var(--amber-800);margin:0.25rem 0 0.75rem;">To unlock live customer orders and merchant confirmation, please configure and save your Shop Profile &amp; Agreements below.</p>
+        <a href="#shopProfileForm" class="btn btn-sm btn-primary" style="font-size:0.8rem;">Complete Shop Profile ↓</a>
+      </div>
+
+      <div id="liveOrdersContainer" style="margin-top:1rem;">
+        <div class="empty-state">
+          <div class="empty-icon">🛵</div>
+          <p>No orders yet. When buyers place orders from your shop, they'll appear here in real time.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 3. PRODUCT UPLOAD FORM (WITH MANDATORY SELLER PHONE) ─── -->
+    <div class="seller-card" id="productUploadCard">
       <div class="seller-card-title">📤 Upload New Product</div>
       <form id="productUploadForm" autocomplete="off">
         <div class="form-grid">
@@ -410,6 +576,12 @@
           <div class="form-group hidden" id="customCategoryGroup">
             <label for="customCategoryInput">Custom Category Name</label>
             <input type="text" id="customCategoryInput" placeholder="e.g. Handicrafts, Dairy, Herbs…" />
+          </div>
+
+          <!-- Mandatory Seller Phone -->
+          <div class="form-group">
+            <label for="productSellerPhone">Seller Contact Phone * <span style="font-size:0.75rem;color:var(--slate-500);">(Required: direct customer contact)</span></label>
+            <input type="tel" id="productSellerPhone" placeholder="e.g. 9876543210" required />
           </div>
 
           <div class="form-group">
@@ -484,20 +656,6 @@
             </tr>
           </tbody>
         </table>
-      </div>
-    </div>
-
-    <!-- ─── LIVE INCOMING ORDERS ─── -->
-    <div class="seller-card">
-      <div class="live-orders-header">
-        <div class="live-dot"></div>
-        <div class="seller-card-title" style="margin-bottom:0;">Live Incoming Orders</div>
-      </div>
-      <div id="liveOrdersContainer">
-        <div class="empty-state">
-          <div class="empty-icon">🛵</div>
-          <p>No orders yet. When buyers place orders from your shop, they'll appear here in real time.</p>
-        </div>
       </div>
     </div>
 

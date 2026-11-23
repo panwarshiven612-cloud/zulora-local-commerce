@@ -52,30 +52,58 @@ All credentials are pre-configured in `js/config.js`. **Do not commit any privat
    - `localhost`
    - Your Vercel domain (e.g. `zulora-local-commerce.vercel.app`)
 
-### Firestore Security Rules (copy-paste ready)
+### Firestore Security Rules (copy-paste ready in `firestore.rules`)
 
 ```js
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isSupremeAdmin() {
+      return request.auth != null && 
+        (request.auth.token.email == 'zulora.help@gmail.com' || 
+         (request.auth.token.email_verified == true && request.auth.token.email == 'zulora.help@gmail.com'));
+    }
+
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if true;
+      allow write: if request.auth != null && (request.auth.uid == userId || isSupremeAdmin());
     }
 
     match /shops/{shopId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && 
+        (resource.data.ownerUid == request.auth.uid || 
+         resource.data.sellerUid == request.auth.uid || 
+         shopId == request.auth.uid || 
+         isSupremeAdmin());
     }
 
     match /products/{productId} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if (request.auth != null && 
+        (resource.data.ownerUid == request.auth.uid || 
+         resource.data.sellerUid == request.auth.uid || 
+         resource.data.shopId == request.auth.uid || 
+         isSupremeAdmin())) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'salesCount', 'inStock']));
+      allow delete: if request.auth != null && 
+        (resource.data.ownerUid == request.auth.uid || 
+         resource.data.sellerUid == request.auth.uid || 
+         resource.data.shopId == request.auth.uid || 
+         isSupremeAdmin());
     }
 
     match /orders/{orderId} {
       allow read: if true;
-      allow write: if true; // allows guest COD + seller status updates
+      allow create: if true;
+      allow update: if true;
+      allow delete: if request.auth != null && 
+        (resource.data.sellerUid == request.auth.uid || 
+         resource.data.shopId == request.auth.uid || 
+         isSupremeAdmin());
     }
   }
 }

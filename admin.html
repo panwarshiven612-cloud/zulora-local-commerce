@@ -66,13 +66,19 @@
         <input type="text" class="form-input" id="adminSearchInput" placeholder="🔍 Search shops, products, users, or orders…" style="width:300px;" />
       </div>
 
-      <!-- KPI Grid -->
-      <div class="dashboard-grid" style="margin-bottom:1.5rem;">
+      <!-- KPI Grid (Real-time Platform Analytics) -->
+      <div class="dashboard-grid" style="margin-bottom:1.5rem;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));">
         <div class="stat-card"><div class="stat-val" id="kpiTotalShops">0</div><div class="stat-label">Registered Shops</div></div>
         <div class="stat-card"><div class="stat-val" id="kpiTotalProducts">0</div><div class="stat-label">Platform Products</div></div>
+        <div class="stat-card"><div class="stat-val emerald" id="kpiActiveProducts" style="color:var(--emerald-600);">0</div><div class="stat-label">Active Products (In Stock)</div></div>
         <div class="stat-card"><div class="stat-val" id="kpiTotalOrders">0</div><div class="stat-label">Cross-Town Orders</div></div>
+        <div class="stat-card"><div class="stat-val amber" id="kpiPendingOrders" style="color:var(--amber-600);">0</div><div class="stat-label">Pending Confirmation</div></div>
+        <div class="stat-card"><div class="stat-val emerald" id="kpiConfirmedOrders" style="color:var(--emerald-600);">0</div><div class="stat-label">Confirmed by Sellers</div></div>
+        <div class="stat-card"><div class="stat-val emerald" id="kpiDeliveredOrders" style="color:var(--emerald-700);">0</div><div class="stat-label">Delivered Orders</div></div>
+        <div class="stat-card"><div class="stat-val" id="kpiCancelledOrders" style="color:var(--rose-600);">0</div><div class="stat-label">Cancelled Orders</div></div>
         <div class="stat-card"><div class="stat-val" id="kpiTotalUsers">0</div><div class="stat-label">Registered Users</div></div>
-        <div class="stat-card"><div class="stat-val" id="kpiTotalGmv">₹0</div><div class="stat-label">Platform GMV</div></div>
+        <div class="stat-card"><div class="stat-val azure" id="kpiTotalGmv">₹0</div><div class="stat-label">Total Platform GMV</div></div>
+        <div class="stat-card"><div class="stat-val emerald" id="kpiDeliveredRevenue" style="color:var(--emerald-600);">₹0</div><div class="stat-label">Completed Revenue</div></div>
         <div class="stat-card" style="border-left:4px solid var(--rose-600);">
           <div class="stat-val" style="color:var(--rose-600);" id="kpiTotalCommission">₹0 (3%)</div>
           <div class="stat-label">Commission Receivable</div>

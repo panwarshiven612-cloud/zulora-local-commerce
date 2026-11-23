@@ -205,14 +205,46 @@ function updateAllViews() {
 // ─── KPI Calculations ────────────────────────────────────────────────────────
 function calculateAndRenderKPIs() {
   const gmv = allOrders.reduce((s, o) => s + (o.totalAmount || o.grandTotal || 0), 0);
+  const deliveredRevenue = allOrders
+    .filter(o => {
+      const st = normalizeStatus(o.orderStatus || o.status);
+      return st === 'Delivered' || st === 'Verified Delivered';
+    })
+    .reduce((s, o) => s + (o.totalAmount || o.grandTotal || 0), 0);
   const commission = Math.round(gmv * PLATFORM_CONSTANTS.PLATFORM_COMMISSION_RATE);
 
-  if (kpiTotalShops)      kpiTotalShops.textContent      = allShops.length;
-  if (kpiTotalProducts)   kpiTotalProducts.textContent   = allProducts.length;
-  if (kpiTotalOrders)     kpiTotalOrders.textContent     = allOrders.length;
-  if (kpiTotalUsers)      kpiTotalUsers.textContent      = allUsers.length;
-  if (kpiTotalGmv)        kpiTotalGmv.textContent        = `₹${gmv.toLocaleString('en-IN')}`;
-  if (kpiTotalCommission) kpiTotalCommission.textContent = `₹${commission.toLocaleString('en-IN')} (3%)`;
+  const activeProducts = allProducts.filter(p => p.inStock && ((p.stock || p.stockCount || 0) > 0)).length;
+
+  let pendingCount = 0;
+  let confirmedCount = 0;
+  let deliveredCount = 0;
+  let cancelledCount = 0;
+
+  allOrders.forEach(o => {
+    const st = normalizeStatus(o.orderStatus || o.status);
+    if (st === 'Placed') pendingCount++;
+    else if (st === 'Confirmed by Merchant') confirmedCount++;
+    else if (st === 'Delivered' || st === 'Verified Delivered') deliveredCount++;
+    else if (st === 'Cancelled') cancelledCount++;
+  });
+
+  const setEl = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  };
+
+  setEl('kpiTotalShops', allShops.length);
+  setEl('kpiTotalProducts', allProducts.length);
+  setEl('kpiActiveProducts', activeProducts);
+  setEl('kpiTotalOrders', allOrders.length);
+  setEl('kpiPendingOrders', pendingCount);
+  setEl('kpiConfirmedOrders', confirmedCount);
+  setEl('kpiDeliveredOrders', deliveredCount);
+  setEl('kpiCancelledOrders', cancelledCount);
+  setEl('kpiTotalUsers', allUsers.length);
+  setEl('kpiTotalGmv', `₹${gmv.toLocaleString('en-IN')}`);
+  setEl('kpiDeliveredRevenue', `₹${deliveredRevenue.toLocaleString('en-IN')}`);
+  setEl('kpiTotalCommission', `₹${commission.toLocaleString('en-IN')} (3%)`);
 }
 
 // ─── 1. Verified Blue-Tick Management (Shop-Level Only) ──────────────────────
@@ -312,14 +344,21 @@ function renderProductsTable(products) {
 }
 
 window.adminDeleteProduct = async function(productId, title = 'this product') {
+  if (!auth?.currentUser) {
+    showToast('Admin session required to delete products.', 'warning');
+    return;
+  }
   if (!confirm(`Are you sure you want to PERMANENTLY DELETE "${title}" from the platform?\nIt will be removed immediately from storefront and search results.`)) return;
   if (!db || isConfigPlaceholder) return;
 
   try {
     await deleteDoc(doc(db, 'products', productId));
-    showToast(`Deleted "${title}" successfully.`, 'success');
+    allProducts = allProducts.filter(p => p.id !== productId);
+    updateAllViews();
+    showToast(`✓ Deleted "${title}" successfully.`, 'success');
   } catch (err) {
-    showToast('Delete failed: ' + err.message, 'error');
+    console.error('[Admin] Delete product error:', err);
+    showToast(`Delete failed: ${err.message} (${err.code || 'unknown'})`, 'error');
   }
 };
 
@@ -389,13 +428,20 @@ window.adminToggleShopStatus = async function(shopId, currentIsOpen) {
 };
 
 window.adminDeleteShop = async function(shopId, shopName = 'this shop') {
+  if (!auth?.currentUser) {
+    showToast('Admin session required to delete shops.', 'warning');
+    return;
+  }
   if (!confirm(`Are you sure you want to PERMANENTLY DELETE shop "${shopName}"?\nThis cannot be undone.`)) return;
   if (!db || isConfigPlaceholder) return;
   try {
     await deleteDoc(doc(db, 'shops', shopId));
+    allShops = allShops.filter(s => s.id !== shopId);
+    updateAllViews();
     showToast(`Shop "${shopName}" deleted.`, 'info');
   } catch(e) {
-    showToast('Failed to delete shop: ' + e.message, 'error');
+    console.error('[Admin] Delete shop error:', e);
+    showToast(`Failed to delete shop: ${e.message} (${e.code || 'unknown'})`, 'error');
   }
 };
 
@@ -451,13 +497,20 @@ function renderOrdersTable(orders) {
 }
 
 window.adminDeleteOrder = async function(orderId) {
+  if (!auth?.currentUser) {
+    showToast('Admin session required to delete orders.', 'warning');
+    return;
+  }
   if (!confirm('Are you sure you want to delete this order record from Firestore?')) return;
   if (!db || isConfigPlaceholder) return;
   try {
     await deleteDoc(doc(db, 'orders', orderId));
+    allOrders = allOrders.filter(o => o.id !== orderId && o.docId !== orderId);
+    updateAllViews();
     showToast('Order record deleted.', 'info');
   } catch (e) {
-    showToast('Failed to delete order: ' + e.message, 'error');
+    console.error('[Admin] Delete order error:', e);
+    showToast(`Failed to delete order: ${e.message} (${e.code || 'unknown'})`, 'error');
   }
 };
 

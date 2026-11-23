@@ -24,8 +24,10 @@ let sellerProducts = [];
 let liveOrders = [];
 let unsubscribeOrders = null;
 let unsubscribeProducts = null;
+let unsubscribeOwnerProds = null;
 let unsubscribeSellerUid = null;
 let selectedFiles = []; // Array of files from multi-image input
+let activeOrderFilter = 'all';
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -83,6 +85,17 @@ function setupEventListeners() {
       customGroup?.classList.add('hidden');
       if (customInput) customInput.value = '';
     }
+  });
+
+  // Order status filter pills
+  const filterPills = document.querySelectorAll('.order-filter-pill');
+  filterPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      filterPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      activeOrderFilter = pill.getAttribute('data-filter') || 'all';
+      renderSellerOrders();
+    });
   });
 }
 
@@ -147,7 +160,9 @@ async function handleSellerLogout() {
   if (!step2) return;
   try {
     if (unsubscribeOrders) { unsubscribeOrders(); unsubscribeOrders = null; }
+    if (unsubscribeSellerUid) { unsubscribeSellerUid(); unsubscribeSellerUid = null; }
     if (unsubscribeProducts) { unsubscribeProducts(); unsubscribeProducts = null; }
+    if (unsubscribeOwnerProds) { unsubscribeOwnerProds(); unsubscribeOwnerProds = null; }
     if (auth && !isConfigPlaceholder) await signOut(auth);
     currentSeller = null;
     currentShop = null;
@@ -253,6 +268,7 @@ function populateShopForm(shop) {
   setVal('shopHandle', shop.handle ? shop.handle.replace(/^@/, '') : '');
   setVal('shopCity', shop.city || shop.town || '');
   setVal('shopPhone', shop.phone || '');
+  setVal('productSellerPhone', shop.phone || currentSeller?.phoneNumber || '');
   setVal('shopUpiId', shop.upiId || '');
   setVal('shopWhatsapp', shop.whatsapp || '');
   setVal('shopDescription', shop.description || '');
@@ -305,6 +321,21 @@ function populateShopForm(shop) {
     const cb = document.getElementById(id);
     if (cb) cb.checked = isAgreed;
   });
+
+  checkSellerEligibility();
+}
+
+function checkSellerEligibility() {
+  const banner = document.getElementById('sellerEligibilityBanner');
+  const isProfileConfigured = Boolean(currentShop && currentShop.name && (currentShop.phone || currentShop.agreementsAccepted));
+  if (banner) {
+    if (isProfileConfigured) {
+      banner.classList.add('hidden');
+    } else {
+      banner.classList.remove('hidden');
+    }
+  }
+  return isProfileConfigured;
 }
 
 async function handleToggleShopStatus(e) {
@@ -438,6 +469,7 @@ async function handleSaveShopProfile(e) {
   try {
     await updateDoc(doc(db, 'shops', currentShop.id), payload);
     Object.assign(currentShop, payload);
+    checkSellerEligibility();
     showToast('Shop profile saved successfully!', 'success');
   } catch (err) {
     showToast('Save failed: ' + err.message, 'error');
@@ -496,15 +528,25 @@ async function handleUploadProduct(e) {
   const title = document.getElementById('productTitle')?.value.trim();
   let category = document.getElementById('productCategory')?.value;
   const customCat = document.getElementById('customCategoryInput')?.value.trim();
+  const rawSellerPhone = document.getElementById('productSellerPhone')?.value.trim();
   const price = parseFloat(document.getElementById('productPrice')?.value);
   const mrp = parseFloat(document.getElementById('productMrp')?.value) || null;
   const unit = document.getElementById('productUnit')?.value.trim();
-  const weight = parseFloat(document.getElementById('productWeight')?.value) || 0.5;
-  const stock = parseInt(document.getElementById('productStock')?.value, 10) || 0;
-  const inStock = document.getElementById('productInStock')?.checked ?? true;
+  const weight = parseFloat(document.getElementById('productWeightKg')?.value || document.getElementById('productWeight')?.value) || 0.5;
+  const rawStock = parseInt(document.getElementById('productStock')?.value, 10);
+  const stockCount = (!isNaN(rawStock) && rawStock >= 0) ? rawStock : 0;
+  const inStock = stockCount > 0;
 
   if (!title) { showToast('Please enter a product title.', 'warning'); return; }
   if (isNaN(price) || price <= 0) { showToast('Please enter a valid selling price.', 'warning'); return; }
+
+  // Mandatory seller mobile phone validation
+  const cleanSellerPhone = (rawSellerPhone || '').replace(/[^0-9]/g, '');
+  if (!cleanSellerPhone || cleanSellerPhone.length < 10) {
+    showToast('Please enter a valid 10-digit seller mobile contact number so buyers can reach you.', 'warning');
+    document.getElementById('productSellerPhone')?.focus();
+    return;
+  }
 
   // Custom category handling
   if (category === 'add_custom') {
@@ -538,25 +580,35 @@ async function handleUploadProduct(e) {
     const coverUrl = imageUrls[0];
 
     const productPayload = {
-      shopId: currentShop?.id || currentSeller.uid,
+      ownerUid: currentSeller.uid,
       sellerUid: currentSeller.uid,
+      shopId: currentShop?.id || currentSeller.uid,
+      sellerPhone: cleanSellerPhone,
+      sellerName: currentShop?.name || currentSeller.displayName || 'Merchant',
       shopName: currentShop?.name || 'Local Seller',
       title,
       category,
       price,
       mrp,
-      unit,
+      unit: unit || '1 unit',
       weightKg: weight,
-      stock: inStock ? stock : 0,
-      inStock: inStock && stock > 0,
+      stockCount: stockCount,
+      stock: stockCount,
+      inStock: inStock,
       imageUrl: coverUrl,
       images: imageUrls,
       salesCount: 0,
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
     };
 
     if (db && !isConfigPlaceholder) {
       await addDoc(collection(db, 'products'), productPayload);
+      // Auto-sync seller phone to shop document if not saved yet
+      if (currentShop && (!currentShop.phone || currentShop.phone !== cleanSellerPhone)) {
+        currentShop.phone = cleanSellerPhone;
+        updateDoc(doc(db, 'shops', currentShop.id), { phone: cleanSellerPhone, updatedAt: serverTimestamp() }).catch(() => {});
+      }
     }
 
     showToast(`✓ "${title}" uploaded to Cloudinary & saved!`, 'success');
@@ -568,37 +620,59 @@ async function handleUploadProduct(e) {
     if (grid) grid.innerHTML = '';
     const customGroup = document.getElementById('customCategoryGroup');
     if (customGroup) customGroup.classList.add('hidden');
+    // Re-fill seller phone
+    const phoneInput = document.getElementById('productSellerPhone');
+    if (phoneInput) phoneInput.value = cleanSellerPhone;
   } catch (err) {
     console.error('[Seller] Upload error:', err);
     showToast('Upload failed: ' + (err.message || 'Unknown error'), 'error');
   } finally {
-    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '🚀 Publish Product'; }
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '➕ Upload Product to Store'; }
   }
 }
 
-// ─── Real Products Listener ───────────────────────────────────────────────────
+// ─── Real Products Listener (Dual Parallel Streams: sellerUid + ownerUid) ───────
 function listenToSellerProducts(sellerUid) {
-  if (unsubscribeProducts) unsubscribeProducts();
+  if (unsubscribeProducts) { unsubscribeProducts(); unsubscribeProducts = null; }
+  if (unsubscribeOwnerProds) { unsubscribeOwnerProds(); unsubscribeOwnerProds = null; }
   if (!db || isConfigPlaceholder || !sellerUid) return;
 
-  // Single-field where query without orderBy prevents Firestore composite index error
-  const q = query(
-    collection(db, 'products'),
-    where('sellerUid', '==', sellerUid)
-  );
+  const prodsMap = new Map();
 
-  unsubscribeProducts = onSnapshot(q, (snapshot) => {
-    const prods = [];
-    snapshot.forEach((d) => {
-      prods.push({ id: d.id, ...d.data() });
-    });
-    // In-memory sort by createdAt descending
+  const handleProdsUpdate = () => {
+    const prods = Array.from(prodsMap.values());
     prods.sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a));
     sellerProducts = prods;
     renderSellerProducts();
     updateDashboardStats();
+  };
+
+  // Stream 1: Query products where sellerUid == sellerUid
+  const qSeller = query(collection(db, 'products'), where('sellerUid', '==', sellerUid));
+  unsubscribeProducts = onSnapshot(qSeller, (snapshot) => {
+    snapshot.forEach((d) => {
+      prodsMap.set(d.id, { id: d.id, ...d.data() });
+    });
+    snapshot.docChanges().forEach((change) => {
+      if (change.type === 'removed') prodsMap.delete(change.doc.id);
+    });
+    handleProdsUpdate();
   }, (err) => {
-    console.error('[Seller] Products onSnapshot error:', err);
+    console.warn('[Seller] Products (sellerUid) stream notice:', err);
+  });
+
+  // Stream 2: Query products where ownerUid == sellerUid (ensures 100% of owner's products are surfaced)
+  const qOwner = query(collection(db, 'products'), where('ownerUid', '==', sellerUid));
+  unsubscribeOwnerProds = onSnapshot(qOwner, (snapshot) => {
+    snapshot.forEach((d) => {
+      prodsMap.set(d.id, { id: d.id, ...d.data() });
+    });
+    snapshot.docChanges().forEach((change) => {
+      if (change.type === 'removed') prodsMap.delete(change.doc.id);
+    });
+    handleProdsUpdate();
+  }, (err) => {
+    console.warn('[Seller] Products (ownerUid) stream notice:', err);
   });
 }
 
@@ -691,13 +765,37 @@ window.updateStock = async function(prodId, currentStock) {
 };
 
 window.deleteProductItem = async function(prodId) {
-  if (!confirm('Are you sure you want to delete this product?')) return;
+  if (!auth?.currentUser) {
+    showToast('Please sign in with Google to delete products.', 'warning');
+    return;
+  }
+  if (!prodId) {
+    showToast('Cannot delete product: Invalid product ID.', 'error');
+    return;
+  }
+
+  const prod = sellerProducts.find(p => p.id === prodId);
+  const title = prod?.title ? `"${prod.title}"` : 'this product';
+
+  if (!confirm(`Are you sure you want to permanently delete ${title}?\nThis action cannot be undone and will immediately remove it from the storefront.`)) return;
   if (!db || isConfigPlaceholder) return;
+
   try {
     await deleteDoc(doc(db, 'products', prodId));
-    showToast('Product deleted.', 'info');
+    // Immediately remove from local array for instant UI response
+    sellerProducts = sellerProducts.filter(p => p.id !== prodId);
+    renderSellerProducts();
+    updateDashboardStats();
+    showToast(`✓ Deleted ${title} successfully.`, 'success');
   } catch (err) {
-    showToast('Delete failed: ' + err.message, 'error');
+    console.error('[Seller] Delete product failed:', err);
+    const errCode = err.code || 'unknown';
+    const errMsg = err.message || 'Permission denied or network failure.';
+    if (errCode === 'permission-denied') {
+      showToast(`Delete failed: Missing or insufficient permissions (${errCode}). Logged in as: ${auth.currentUser.email || auth.currentUser.uid}. Ensure Firestore rules allow product owners to delete products.`, 'error');
+    } else {
+      showToast(`Delete failed: ${errMsg} (${errCode})`, 'error');
+    }
   }
 };
 
@@ -801,23 +899,65 @@ function renderSellerOrders() {
   const container = document.getElementById('liveOrdersContainer') || document.getElementById('sellerOrdersContainer');
   if (!container) return;
 
-  if (liveOrders.length === 0) {
+  const isEligible = checkSellerEligibility();
+  if (!isEligible) {
     container.innerHTML = `
-      <div style="text-align:center;padding:3rem 1rem;background:var(--glass-bg);border-radius:var(--radius-lg);border:1px dashed var(--slate-300);">
-        <div style="font-size:2.5rem;margin-bottom:0.5rem;">📦</div>
-        <h4 style="font-size:1.05rem;color:var(--slate-800);margin-bottom:0.25rem;">No Incoming Orders Yet</h4>
-        <p style="font-size:0.85rem;color:var(--slate-500);">New customer orders will appear here in real-time with 1-tap call & WhatsApp confirmation buttons.</p>
+      <div style="text-align:center;padding:2.5rem 1rem;background:var(--slate-50);border-radius:var(--radius-lg);border:1px dashed var(--amber-300);">
+        <div style="font-size:2.5rem;margin-bottom:0.5rem;">🏪</div>
+        <h4 style="font-size:1.05rem;color:var(--slate-800);margin-bottom:0.35rem;">Complete Shop Profile to Unlock Orders</h4>
+        <p style="font-size:0.85rem;color:var(--slate-600);max-width:480px;margin:0 auto 1rem;">
+          To receive live customer orders and use Merchant Confirmation, fill out and save your Shop Profile &amp; Agreements below.
+        </p>
+        <a href="#shopProfileForm" class="btn btn-primary" style="font-size:0.82rem;padding:0.4rem 0.9rem;">
+          Complete Shop Profile ↓
+        </a>
       </div>
     `;
     return;
   }
 
-  container.innerHTML = liveOrders.map(order => {
+  // Filter orders by active filter pill
+  let filtered = liveOrders;
+  if (activeOrderFilter === 'placed') {
+    filtered = liveOrders.filter(o => normalizeStatus(o.orderStatus || o.status) === 'Placed');
+  } else if (activeOrderFilter === 'confirmed') {
+    filtered = liveOrders.filter(o => normalizeStatus(o.orderStatus || o.status) === 'Confirmed by Merchant');
+  } else if (activeOrderFilter === 'out_for_delivery') {
+    filtered = liveOrders.filter(o => normalizeStatus(o.orderStatus || o.status) === 'Packed / Out for Delivery');
+  } else if (activeOrderFilter === 'delivered') {
+    filtered = liveOrders.filter(o => {
+      const s = normalizeStatus(o.orderStatus || o.status);
+      return s === 'Delivered' || s === 'Verified Delivered';
+    });
+  } else if (activeOrderFilter === 'cancelled') {
+    filtered = liveOrders.filter(o => normalizeStatus(o.orderStatus || o.status) === 'Cancelled');
+  }
+
+  if (filtered.length === 0) {
+    const filterLabels = {
+      all: 'No incoming orders yet. When buyers place orders from your shop, they will appear here in real time.',
+      placed: 'No newly placed orders pending merchant confirmation.',
+      confirmed: 'No orders currently in Confirmed status.',
+      out_for_delivery: 'No orders currently out for delivery.',
+      delivered: 'No orders marked as Delivered yet.',
+      cancelled: 'No cancelled orders.'
+    };
+    container.innerHTML = `
+      <div style="text-align:center;padding:3rem 1rem;background:var(--glass-bg);border-radius:var(--radius-lg);border:1px dashed var(--slate-300);">
+        <div style="font-size:2.5rem;margin-bottom:0.5rem;">📦</div>
+        <h4 style="font-size:1.05rem;color:var(--slate-800);margin-bottom:0.25rem;">No Orders in this View</h4>
+        <p style="font-size:0.85rem;color:var(--slate-500);">${filterLabels[activeOrderFilter] || 'No orders found.'}</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtered.map(order => {
     const rawStatus = order.orderStatus || order.status || 'Placed';
     const status = normalizeStatus(rawStatus);
     const cleanPhone = (order.buyerPhone || '').replace(/[^0-9]/g, '');
-    const callUrl = `tel:+91${cleanPhone}`;
-    const waUrl = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(`Hi ${order.buyerName}, your Zulora order #${order.orderCode || order.orderId || order.id} is confirmed!`)}`;
+    const callUrl = cleanPhone ? `tel:+91${cleanPhone}` : '#';
+    const waUrl = cleanPhone ? `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(`Hi ${order.buyerName}, your Zulora Local order #${order.orderCode || order.orderId || order.id} is confirmed!`)}` : '#';
     const dist = (order.distanceKm != null || order.distKm != null) ? `${order.distanceKm ?? order.distKm} km` : 'Local';
 
     return `
@@ -829,7 +969,7 @@ function renderSellerOrders() {
               <span class="badge" style="background:${getStatusBadgeColor(status)};color:#fff;font-size:0.75rem;">${escapeHtml(status)}</span>
             </div>
             <div style="font-size:0.82rem;color:var(--slate-700);margin-top:0.25rem;">
-              Buyer: <strong>${escapeHtml(order.buyerName)}</strong> (<a href="${callUrl}" style="color:var(--azure-700);font-weight:700;">+91 ${escapeHtml(order.buyerPhone)}</a>)
+              Buyer: <strong>${escapeHtml(order.buyerName || 'Customer')}</strong> ${cleanPhone ? `(<a href="${callUrl}" style="color:var(--azure-700);font-weight:700;">+91 ${escapeHtml(cleanPhone)}</a>)` : ''}
             </div>
             <div style="font-size:0.8rem;color:var(--slate-600);margin-top:0.2rem;">
               📍 Address: ${escapeHtml(order.buyerAddress || 'Address on file')}${order.buyerCityTown ? `, ${escapeHtml(order.buyerCityTown)}` : ''}${order.buyerState ? `, ${escapeHtml(order.buyerState)}` : ''}
@@ -845,7 +985,7 @@ function renderSellerOrders() {
         </div>
 
         <!-- Ordered Items list -->
-        <div style="background:var(--slate-50);border:1px solid var(--border-subtle);padding:0.65rem 0.85rem;border-radius:var(--radius-md);margin-bottom:0.75rem;font-size:0.82rem;">
+        <div style="background:var(--slate-50);border:1px solid var(--slate-200);padding:0.65rem 0.85rem;border-radius:var(--radius-md);margin-bottom:0.75rem;font-size:0.82rem;">
           <div style="font-weight:700;color:var(--slate-700);margin-bottom:0.35rem;">Ordered Items:</div>
           ${(order.items || []).map(i => `<div style="display:flex;justify-content:space-between;padding:0.2rem 0;border-bottom:1px dashed var(--slate-200);">
             <span>• ${escapeHtml(i.title)} ${i.unit ? `(${escapeHtml(i.unit)})` : ''} × ${i.qty || i.quantity}</span>
@@ -862,25 +1002,25 @@ function renderSellerOrders() {
           <span style="font-size:0.78rem;font-weight:800;color:var(--slate-700);margin-right:0.25rem;">Live Action:</span>
           
           <button class="btn btn-sm ${status === 'Confirmed by Merchant' ? 'btn-primary' : 'btn-ghost'}" 
-            onclick="window.updateOrderStatus('${escapeHtml(order.id)}', 'Confirmed by Merchant')" 
+            onclick="window.updateOrderStatus('${escapeHtml(order.id || order.docId)}', 'Confirmed by Merchant')" 
             style="font-size:0.75rem;padding:0.3rem 0.65rem;font-weight:700;">
             ✅ Confirm Order
           </button>
 
           <button class="btn btn-sm ${status === 'Packed / Out for Delivery' ? 'btn-primary' : 'btn-ghost'}" 
-            onclick="window.updateOrderStatus('${escapeHtml(order.id)}', 'Packed / Out for Delivery')" 
+            onclick="window.updateOrderStatus('${escapeHtml(order.id || order.docId)}', 'Packed / Out for Delivery')" 
             style="font-size:0.75rem;padding:0.3rem 0.65rem;font-weight:700;">
             🛵 Out for Delivery
           </button>
 
           <button class="btn btn-sm ${status === 'Delivered' || status === 'Verified Delivered' ? 'btn-primary' : 'btn-ghost'}" 
-            onclick="window.updateOrderStatus('${escapeHtml(order.id)}', 'Delivered')" 
-            style="font-size:0.75rem;padding:0.3rem 0.65rem;font-weight:700;background:${status === 'Delivered' || status === 'Verified Delivered' ? 'var(--emerald-600)' : ''};border-color:var(--emerald-600);">
+            onclick="window.updateOrderStatus('${escapeHtml(order.id || order.docId)}', 'Delivered')" 
+            style="font-size:0.75rem;padding:0.3rem 0.65rem;font-weight:700;${status === 'Delivered' || status === 'Verified Delivered' ? 'background:var(--emerald-600);border-color:var(--emerald-600);' : ''}">
             🎉 Mark Delivered
           </button>
 
           <button class="btn btn-sm btn-ghost" 
-            onclick="window.sellerCancelOrder('${escapeHtml(order.id)}')" 
+            onclick="window.sellerCancelOrder('${escapeHtml(order.id || order.docId)}')" 
             style="font-size:0.75rem;padding:0.3rem 0.65rem;color:var(--rose-600);border-color:var(--rose-200);">
             ✕ Cancel Order
           </button>
@@ -888,12 +1028,16 @@ function renderSellerOrders() {
 
         <!-- Customer Communication links -->
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-          <a href="${callUrl}" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:0.3rem;">
-            📞 Call Buyer
-          </a>
-          <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="display:inline-flex;align-items:center;gap:0.3rem;">
-            💬 WhatsApp Confirmation
-          </a>
+          ${cleanPhone ? `
+            <a href="${callUrl}" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:0.3rem;">
+              📞 Call Buyer
+            </a>
+            <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="display:inline-flex;align-items:center;gap:0.3rem;">
+              💬 WhatsApp Confirmation
+            </a>
+          ` : `
+            <span style="font-size:0.75rem;color:var(--slate-400);">No buyer phone recorded</span>
+          `}
         </div>
       </div>
     `;
@@ -902,16 +1046,44 @@ function renderSellerOrders() {
 
 window.updateOrderStatus = async function(orderDocId, newStatus) {
   if (!db || isConfigPlaceholder) return;
+  const updates = {
+    orderStatus: newStatus,
+    statusUpdatedAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+
+  const norm = normalizeStatus(newStatus);
+  if (norm === 'Confirmed by Merchant') {
+    updates.status = 'confirmed';
+    updates.confirmedAt = serverTimestamp();
+  } else if (norm === 'Packed / Out for Delivery') {
+    updates.status = 'out_for_delivery';
+    updates.outForDeliveryAt = serverTimestamp();
+  } else if (norm === 'Delivered') {
+    updates.status = 'delivered';
+    updates.deliveredAt = serverTimestamp();
+  } else if (norm === 'Cancelled') {
+    updates.status = 'cancelled';
+    updates.cancelledAt = serverTimestamp();
+    updates.cancelledBy = 'merchant';
+  } else {
+    updates.status = newStatus.toLowerCase();
+  }
+
   try {
-    await updateDoc(doc(db, 'orders', orderDocId), {
-      orderStatus: newStatus,
-      status: newStatus.toLowerCase(),
-      statusUpdatedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-    showToast(`Order status updated to: ${newStatus}`, 'success');
+    await updateDoc(doc(db, 'orders', orderDocId), updates);
+    // Optimistic local update
+    const o = liveOrders.find(ord => (ord.id === orderDocId || ord.docId === orderDocId));
+    if (o) {
+      o.orderStatus = newStatus;
+      o.status = updates.status;
+      renderSellerOrders();
+      updateDashboardStats();
+    }
+    showToast(`✓ Order status updated to: ${newStatus}`, 'success');
   } catch (err) {
-    showToast('Failed to update status: ' + err.message, 'error');
+    console.error('[Seller] updateOrderStatus failed:', err);
+    showToast('Failed to update status: ' + (err.message || err.code || 'Permission error'), 'error');
   }
 };
 
@@ -923,9 +1095,18 @@ window.sellerCancelOrder = async function(orderDocId) {
       orderStatus: 'Cancelled',
       status: 'cancelled',
       cancelledAt: serverTimestamp(),
+      cancelledBy: 'merchant',
       statusUpdatedAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
+    // Optimistic local update
+    const o = liveOrders.find(ord => (ord.id === orderDocId || ord.docId === orderDocId));
+    if (o) {
+      o.orderStatus = 'Cancelled';
+      o.status = 'cancelled';
+      renderSellerOrders();
+      updateDashboardStats();
+    }
     showToast('Order cancelled.', 'info');
   } catch (err) {
     showToast('Failed to cancel order: ' + err.message, 'error');
@@ -956,11 +1137,34 @@ function getStatusBadgeColor(status) {
   }
 }
 
-// ─── Dashboard Stats & Commission ─────────────────────────────────────────────
+// ─── Dashboard Stats & Analytical Breakdown ──────────────────────────────────
 function updateDashboardStats() {
   const totalSales = liveOrders.reduce((sum, o) => sum + (o.totalAmount || o.grandTotal || 0), 0);
+  const deliveredRevenue = liveOrders
+    .filter(o => {
+      const s = normalizeStatus(o.orderStatus || o.status);
+      return s === 'Delivered' || s === 'Verified Delivered';
+    })
+    .reduce((sum, o) => sum + (o.totalAmount || o.grandTotal || 0), 0);
+
   const totalOrders = liveOrders.length;
+  let pendingOrders = 0;
+  let confirmedOrders = 0;
+  let outForDeliveryOrders = 0;
+  let deliveredOrders = 0;
+  let cancelledOrders = 0;
+
+  liveOrders.forEach(o => {
+    const s = normalizeStatus(o.orderStatus || o.status);
+    if (s === 'Placed') pendingOrders++;
+    else if (s === 'Confirmed by Merchant') confirmedOrders++;
+    else if (s === 'Packed / Out for Delivery') outForDeliveryOrders++;
+    else if (s === 'Delivered' || s === 'Verified Delivered') deliveredOrders++;
+    else if (s === 'Cancelled') cancelledOrders++;
+  });
+
   const activeProducts = sellerProducts.filter(p => p.inStock && p.stock > 0).length;
+  const lowStockCount = sellerProducts.filter(p => (p.stock <= 5 || !p.inStock)).length;
   const commission = Math.round(totalSales * PLATFORM_CONSTANTS.PLATFORM_COMMISSION_RATE);
 
   const setEl = (id, val) => {
@@ -969,9 +1173,125 @@ function updateDashboardStats() {
   };
 
   setEl('statTotalSales', `₹${totalSales.toLocaleString('en-IN')}`);
+  setEl('statDeliveredRevenue', `₹${deliveredRevenue.toLocaleString('en-IN')}`);
   setEl('statTotalOrders', totalOrders);
+  setEl('statPendingOrders', pendingOrders);
+  setEl('statConfirmedOrders', confirmedOrders);
+  setEl('statOutForDeliveryOrders', outForDeliveryOrders);
+  setEl('statDeliveredOrders', deliveredOrders);
+  setEl('statCancelledOrders', cancelledOrders);
   setEl('statActiveProducts', activeProducts);
+  setEl('statLowStockCount', lowStockCount);
   setEl('statCommissionOwed', `₹${commission.toLocaleString('en-IN')}`);
+
+  // Update order filter pill counts
+  setEl('countFilterAll', totalOrders);
+  setEl('countFilterPlaced', pendingOrders);
+  setEl('countFilterConfirmed', confirmedOrders);
+  setEl('countFilterOut', outForDeliveryOrders);
+  setEl('countFilterDelivered', deliveredOrders);
+  setEl('countFilterCancelled', cancelledOrders);
+
+  // Update commission ledger card
+  setEl('ledgerDeliveredCount', deliveredOrders);
+  setEl('ledgerGmv', `₹${deliveredRevenue.toLocaleString('en-IN')}`);
+  setEl('ledgerCommission', `₹${Math.round(deliveredRevenue * PLATFORM_CONSTANTS.PLATFORM_COMMISSION_RATE).toLocaleString('en-IN')}`);
+
+  // Render product performance breakdown and recent activity
+  renderAnalyticsProductBreakdown();
+  renderRecentActivityFeed();
+}
+
+// ─── Product Performance Breakdown Table ──────────────────────────────────────
+function renderAnalyticsProductBreakdown() {
+  const tbody = document.getElementById('analyticsProductTableBody');
+  if (!tbody) return;
+
+  if (sellerProducts.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:1.5rem;color:var(--slate-400);">No products uploaded yet. Upload products above to track performance.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = sellerProducts.map(p => {
+    const cover = (p.images && p.images[0]) || p.imageUrl || 'https://via.placeholder.com/80x60?text=No+Img';
+    const age = calculateProductAge(p.createdAt);
+    const sold = p.salesCount || 0;
+    const estRev = sold * (p.price || 0);
+    const inStock = Boolean(p.inStock && p.stock > 0);
+    const stockStatus = inStock 
+      ? (p.stock <= 5 ? '<span style="color:var(--amber-600);font-weight:700;">⚠️ Low Stock</span>' : '<span style="color:var(--emerald-600);font-weight:700;">🟢 In Stock</span>')
+      : '<span style="color:var(--rose-600);font-weight:700;">🔴 Out of Stock</span>';
+
+    return `
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:0.6rem;">
+            <img src="${escapeHtml(cover)}" alt="" style="width:36px;height:36px;border-radius:4px;object-fit:cover;border:1px solid var(--slate-200);flex-shrink:0;" />
+            <span style="font-weight:700;color:var(--slate-900);font-size:0.82rem;">${escapeHtml(p.title)}</span>
+          </div>
+        </td>
+        <td><span class="badge" style="background:var(--slate-100);font-size:0.72rem;">${escapeHtml(p.category)}</span></td>
+        <td><strong>₹${p.price}</strong></td>
+        <td style="font-weight:700;color:var(--azure-800);">${sold} units</td>
+        <td style="font-weight:800;color:var(--emerald-600);">₹${estRev.toLocaleString('en-IN')}</td>
+        <td style="font-weight:700;">${p.stock} <span style="font-size:0.72rem;color:var(--slate-400);">(${escapeHtml(p.unit || 'pcs')})</span></td>
+        <td>${stockStatus}</td>
+        <td style="font-size:0.75rem;color:var(--slate-400);">${age}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ─── Recent Order Activity Feed ───────────────────────────────────────────────
+function renderRecentActivityFeed() {
+  const container = document.getElementById('recentActivityFeed');
+  if (!container) return;
+
+  if (liveOrders.length === 0) {
+    container.innerHTML = `<div style="text-align:center;padding:1rem;color:var(--slate-400);font-size:0.85rem;">No recent order activity recorded.</div>`;
+    return;
+  }
+
+  const recent = liveOrders.slice(0, 6);
+  container.innerHTML = recent.map(o => {
+    const rawStatus = o.orderStatus || o.status || 'Placed';
+    const status = normalizeStatus(rawStatus);
+    const dateStr = formatOrderDate(o.createdAt || o.createdAtIso);
+    let icon = '🛒';
+    if (status === 'Delivered' || status === 'Verified Delivered') icon = '🎉';
+    else if (status === 'Cancelled') icon = '✕';
+    else if (status === 'Packed / Out for Delivery') icon = '🛵';
+    else if (status === 'Confirmed by Merchant') icon = '✅';
+
+    return `
+      <div class="activity-feed-item">
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <span style="font-size:1.1rem;">${icon}</span>
+          <div>
+            <div style="font-weight:700;color:var(--slate-800);">Order #${escapeHtml(o.orderCode || o.orderId || o.id)} — ₹${o.totalAmount || o.grandTotal || 0}</div>
+            <div style="font-size:0.7rem;color:var(--slate-500);">${escapeHtml(o.buyerName || 'Customer')} • ${escapeHtml(status)}</div>
+          </div>
+        </div>
+        <div style="font-size:0.7rem;color:var(--slate-400);">${dateStr}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ─── Date Formatter Helper ────────────────────────────────────────────────────
+function formatOrderDate(ts) {
+  if (!ts) return 'Just now';
+  let d;
+  if (ts.toDate) d = ts.toDate();
+  else if (ts.seconds) d = new Date(ts.seconds * 1000);
+  else d = new Date(ts);
+  if (isNaN(d.getTime())) return 'Recently';
+  return d.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }
 
 // ─── Product Age Helper ───────────────────────────────────────────────────────

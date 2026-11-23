@@ -958,14 +958,14 @@ window.executeOrderPlacement = async function() {
       buyerCoords: (userLocation?.lat != null && userLocation?.lng != null)
         ? { lat: userLocation.lat, lng: userLocation.lng }
         : null,
-      sellerUid: group.shop.sellerUid || group.shop.ownerUid || group.shop.ownerId || group.items[0]?.product?.sellerUid || shopId,
+      sellerUid: group.shop.sellerUid || group.shop.ownerUid || group.shop.ownerId || group.items[0]?.product?.sellerUid || group.items[0]?.product?.ownerUid || shopId,
       shopId,
       shopName: group.shop.name || 'Local Seller',
-      shopPhone: group.shop.phone || '',
+      shopPhone: group.shop.phone || group.items[0]?.product?.sellerPhone || '',
       shopEmail: group.shop.ownerEmail || group.shop.email || '',
       shopUpiId: group.shop.upiId || '',
       shopQrUrl: group.shop.upiQrImageUrl || '',
-      sellerPhone: group.shop.phone || '',
+      sellerPhone: group.shop.phone || group.items[0]?.product?.sellerPhone || '',
       sellerEmail: group.shop.ownerEmail || group.shop.email || '',
       items: group.items.map(i => ({
         productId: i.product.id,
