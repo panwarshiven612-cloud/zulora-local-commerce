@@ -102,12 +102,17 @@ export function groupCartByShop(allShops = new Map(), userLocation = null) {
   Object.values(cart).forEach(item => {
     const shopId = item.product.shopId || 'shop_direct';
     if (!groups[shopId]) {
-      const shop = allShops.get(shopId) || {
+      const rawShop = allShops.get(shopId);
+      const shop = rawShop ? { ...rawShop } : {
         id: shopId,
+        sellerUid: item.product.sellerUid || shopId,
         name: item.product.shopName || 'Local Seller',
         lat: null,
         lng: null
       };
+      if (!shop.sellerUid) {
+        shop.sellerUid = item.product.sellerUid || shop.ownerUid || shop.ownerId || shopId;
+      }
       groups[shopId] = {
         shop,
         items: [],

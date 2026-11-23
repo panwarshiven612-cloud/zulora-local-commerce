@@ -279,8 +279,9 @@
       <ul class="menu-nav-list">
         <li><button type="button" id="menuItemLocation" class="menu-nav-item"><span class="menu-item-icon">📍</span> Location Settings</button></li>
         <li><button type="button" id="menuItemSettings" class="menu-nav-item"><span class="menu-item-icon">⚙️</span> App & Notification Settings</button></li>
-        <li><button type="button" id="menuItemAbout" class="menu-nav-item"><span class="menu-item-icon">ℹ️</span> About Us (Zulora AI)</button></li>
+        <li><button type="button" id="menuItemPolicy" class="menu-nav-item"><span class="menu-item-icon">📋</span> Zulora Local Policy</button></li>
         <li><button type="button" id="menuItemTerms" class="menu-nav-item"><span class="menu-item-icon">📜</span> Terms & Conditions</button></li>
+        <li><button type="button" id="menuItemAbout" class="menu-nav-item"><span class="menu-item-icon">ℹ️</span> About Us (Zulora AI)</button></li>
       </ul>
 
       <div class="menu-section-label">Zulora Ecosystem</div>
@@ -361,7 +362,7 @@
         <h4 style="font-weight:800;color:var(--azure-900);margin:0 0 0.35rem;">3. Minimum Order, Distance &amp; Weight Pricing</h4>
         <p style="margin-bottom:0.75rem;">
           • <strong>Minimum Order:</strong> ₹50 per store order.<br/>
-          • <strong>Distance Charge:</strong> ₹15 per km from store to customer location.<br/>
+          • <strong>Distance Charge:</strong> ₹15 per km from store to customer location (or seller's custom rate).<br/>
           • <strong>Weight Surcharge:</strong> First 2 kg free of extra weight charge; for extra weight above 2 kg, ₹10 per km is charged for the extra weight tier.
         </p>
 
@@ -373,6 +374,55 @@
       </div>
       <div class="modal-footer" style="display:flex;justify-content:flex-end;">
         <button id="btnAgreeTerms" class="btn btn-primary">Understood &amp; Accept ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       ZULORA LOCAL POLICY & GUIDELINES MODAL
+  ═══════════════════════════════════════════════ -->
+  <div id="policyModal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Zulora Local Policy">
+    <div class="modal-box" style="max-width:580px;">
+      <div class="modal-header">
+        <h3 style="font-size:1.1rem;font-weight:800;color:var(--slate-900);">📋 Zulora Local Policy &amp; Guidelines</h3>
+        <button id="btnClosePolicyModal" class="btn btn-icon" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" style="font-size:0.84rem;line-height:1.6;color:var(--slate-700);max-height:68vh;overflow-y:auto;padding-right:0.5rem;">
+        <h4 style="font-weight:800;color:var(--azure-900);margin:0 0 0.35rem;">1. Platform Mission &amp; 100% Free Architecture</h4>
+        <p style="margin-bottom:0.75rem;">Zulora Local is built by Zulora AI as a free, open, hyperlocal software platform powering local neighbourhood merchants, grocery shops, and crop farmers. Operating on a 100% free static architecture (Vercel + Firebase Spark + Cloudinary), we do not charge buyer platform fees, convenience fees, or inflated commissions.</p>
+
+        <h4 style="font-weight:800;color:var(--azure-900);margin:0 0 0.35rem;">2. Merchant Self-Delivery Model</h4>
+        <p style="margin-bottom:0.75rem;">Every order is delivered directly by the merchant or their trusted local runner. Zulora Local operates as a software link, not an employer of riders. This allows customers to receive fresh produce directly from local neighbourhood shops with complete transparency.</p>
+
+        <h4 style="font-weight:800;color:var(--azure-900);margin:0 0 0.35rem;">3. Fair Hyperlocal Pricing &amp; Distance Rules</h4>
+        <p style="margin-bottom:0.75rem;">
+          • <strong>Minimum Order Value:</strong> Strictly ₹50 per store to protect sellers against unviable tiny trips.<br/>
+          • <strong>Distance Rate:</strong> ₹15 per km by default (merchants may customize from ₹5/km to ₹100/km in Seller Studio).<br/>
+          • <strong>Weight Allowance:</strong> First 2 kg free of extra weight charge; above 2 kg, an extra weight tier of ₹10/km per additional kg is charged to compensate the delivery person fairly.
+        </p>
+
+        <h4 style="font-weight:800;color:var(--azure-900);margin:0 0 0.35rem;">4. Direct UPI &amp; Cash on Delivery (COD) Transparency</h4>
+        <p style="margin-bottom:0.75rem;">Zero third-party payment gateway cuts. When a customer chooses Direct UPI, they scan the merchant's exact QR code or copy the seller's UPI ID, sending money directly to the merchant's account. Cash on Delivery is paid in hand upon delivery.</p>
+
+        <h4 style="font-weight:800;color:var(--azure-900);margin:0 0 0.35rem;">5. Order Lifecycle, Live Tracking &amp; Cancellation</h4>
+        <p style="margin-bottom:0.75rem;">
+          • <strong>Live Stepper:</strong> Track real-time progress: Placed ➔ Confirmed by Merchant ➔ Packed / Out for Delivery ➔ Delivered.<br/>
+          • <strong>5-Minute Cancellation:</strong> Buyers can cancel any order within 5 minutes of placement directly on My Orders before packing begins.<br/>
+          • <strong>Delivery Verification:</strong> Buyers confirm delivery receipt with one click upon inspecting their order.
+        </p>
+
+        <h4 style="font-weight:800;color:var(--azure-900);margin:0 0 0.35rem;">6. Anti-Counterfeit &amp; Zero Fake Products Policy</h4>
+        <p style="margin-bottom:0.75rem;">Zero seed or demo products are tolerated. Every product listed must be in actual physical stock with truthful pricing, weight, and description. Violation leads to immediate suspension by Supreme Admin.</p>
+
+        <h4 style="font-weight:800;color:var(--azure-900);margin:0 0 0.35rem;">7. Supreme Admin Verification &amp; Support</h4>
+        <p style="margin-bottom:0.75rem;">Stores verified by Supreme Admin (<strong>zulora.help@gmail.com</strong>) receive an inline verified blue-tick badge. For any delivery queries, refunds, or issues, contact:</p>
+        <div style="background:#f1f5f9;padding:0.65rem 0.85rem;border-radius:var(--radius-md);border-left:4px solid var(--azure-600);font-size:0.82rem;">
+          📧 Email: <a href="mailto:zulora.help@gmail.com" style="color:var(--azure-700);font-weight:700;">zulora.help@gmail.com</a><br/>
+          📞 Helpline &amp; WhatsApp: <a href="tel:+916395211325" style="color:var(--azure-700);font-weight:700;">+91 6395211325</a>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex;justify-content:flex-end;">
+        <button id="btnAgreePolicy" class="btn btn-primary">Understood &amp; Accept Policy ✓</button>
       </div>
     </div>
   </div>
@@ -401,9 +451,23 @@
         <div style="margin-bottom:1.1rem;border-top:1px solid var(--slate-100);padding-top:0.9rem;">
           <h4 style="font-size:0.9rem;font-weight:800;margin-bottom:0.35rem;color:var(--azure-800);">🔔 Notification Preferences</h4>
           <p style="font-size:0.8rem;color:var(--slate-500);margin-bottom:0.5rem;">Get live order updates, cart reminders, and local deal alerts in your browser.</p>
-          <button id="btnSettingsEnablePush" class="btn btn-primary btn-sm" style="margin-bottom:0.4rem;">
+          <button id="btnSettingsEnablePush" class="btn btn-primary btn-sm" style="margin-bottom:0.6rem;">
             Enable Browser Push Notifications
           </button>
+          <div style="display:flex;flex-direction:column;gap:0.4rem;font-size:0.8rem;color:var(--slate-700);">
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
+              <input type="checkbox" id="prefOrderNotifs" checked />
+              <span>📦 Live Order Placement &amp; Delivery Updates</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
+              <input type="checkbox" id="prefCartReminders" checked />
+              <span>🛒 Cart &amp; Checkout Item Reminders</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;">
+              <input type="checkbox" id="prefLocalDeals" checked />
+              <span>🌾 Neighbourhood Deals &amp; Store Updates</span>
+            </label>
+          </div>
         </div>
 
         <!-- Location & Address -->
@@ -427,6 +491,15 @@
         <div style="margin-bottom:1.1rem;border-top:1px solid var(--slate-100);padding-top:0.9rem;">
           <h4 style="font-size:0.9rem;font-weight:800;margin-bottom:0.35rem;color:var(--azure-800);">ℹ️ About Zulora Local</h4>
           <p style="font-size:0.8rem;color:var(--slate-500);line-height:1.5;">Version 3.0 • 100% free on Vercel + Firebase Spark + Cloudinary. Built by Zulora AI to empower neighbourhood merchants.</p>
+        </div>
+
+        <!-- Policy & Guidelines -->
+        <div style="margin-bottom:1.1rem;border-top:1px solid var(--slate-100);padding-top:0.9rem;">
+          <h4 style="font-size:0.9rem;font-weight:800;margin-bottom:0.35rem;color:var(--azure-800);">📋 Zulora Local Policy</h4>
+          <p style="font-size:0.8rem;color:var(--slate-500);margin-bottom:0.4rem;">Merchant self-delivery, distance pricing, and direct UPI transparency.</p>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('settingsModal').classList.remove('open');window.openPolicyModal();">
+            Read Zulora Local Policy →
+          </button>
         </div>
 
         <!-- Terms & Conditions -->

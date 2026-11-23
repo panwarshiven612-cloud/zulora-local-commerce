@@ -79,8 +79,13 @@ function initAdminAuth() {
     if (user && user.email === PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL) {
       currentAdmin = user;
       grantAdminAccess(user.email);
-      listenLiveAdminData();
+      try {
+        listenLiveAdminData();
+      } catch (err) {
+        console.error('[Admin] listenLiveAdminData error:', err);
+      }
     } else if (user) {
+      showGate();
       alert(`⛔ Access Denied!\nYou are signed in as ${user.email}.\nOnly ${PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL} has Supreme Admin access.`);
       window.location.href = './index.html';
     } else {
@@ -95,15 +100,21 @@ function initAdminAuth() {
 }
 
 function showGate() {
-  document.getElementById('adminLoadingState')?.classList.add('hidden');
-  adminAuthGate?.classList.remove('hidden');
-  adminDashboard?.classList.add('hidden');
+  const loading = document.getElementById('adminLoadingState');
+  if (loading) { loading.classList.add('hidden'); loading.style.display = 'none'; }
+  const gate = document.getElementById('adminAuthGate');
+  if (gate) { gate.classList.remove('hidden'); gate.style.display = 'block'; }
+  const dash = document.getElementById('adminDashboard');
+  if (dash) { dash.classList.add('hidden'); dash.style.display = 'none'; }
 }
 
 function grantAdminAccess(email) {
-  document.getElementById('adminLoadingState')?.classList.add('hidden');
-  adminAuthGate?.classList.add('hidden');
-  adminDashboard?.classList.remove('hidden');
+  const loading = document.getElementById('adminLoadingState');
+  if (loading) { loading.classList.add('hidden'); loading.style.display = 'none'; }
+  const gate = document.getElementById('adminAuthGate');
+  if (gate) { gate.classList.add('hidden'); gate.style.display = 'none'; }
+  const dash = document.getElementById('adminDashboard');
+  if (dash) { dash.classList.remove('hidden'); dash.style.display = 'block'; }
   if (adminEmailDisp) adminEmailDisp.textContent = email;
 }
 

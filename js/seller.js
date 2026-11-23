@@ -39,6 +39,18 @@ function setupEventListeners() {
   document.getElementById('btnSellerLogin')?.addEventListener('click', handleSellerLogin);
   document.getElementById('btnSellerLogout')?.addEventListener('click', handleSellerLogout);
 
+  // Browser notifications test / request
+  document.getElementById('btnSellerTestNotif')?.addEventListener('click', async () => {
+    const granted = await requestNotificationPermission();
+    if (granted) {
+      playOrderNotificationChime();
+      triggerBrowserNotification('🔔 Zulora Local Alerts Enabled!', 'You will receive real-time notifications whenever a customer places an order.', './seller.html');
+      showToast('Push alerts enabled! Sound & notification test sent.', 'success');
+    } else {
+      showToast('Notification permission was blocked or dismissed in browser settings.', 'warning');
+    }
+  });
+
   // Shop status toggle (Open / Closed)
   document.getElementById('shopStatusToggle')?.addEventListener('change', handleToggleShopStatus);
 
@@ -149,10 +161,12 @@ async function handleSellerLogout() {
 }
 
 function showDashboard(user) {
-  document.getElementById('authConnectingState')?.classList.add('hidden');
-  document.getElementById('authSection')?.classList.add('hidden');
+  const loading = document.getElementById('authConnectingState');
+  if (loading) { loading.classList.add('hidden'); loading.style.display = 'none'; }
+  const authSec = document.getElementById('authSection');
+  if (authSec) { authSec.classList.add('hidden'); authSec.style.display = 'none'; }
   const dash = document.getElementById('dashboardSection');
-  if (dash) { dash.style.display = 'block'; }
+  if (dash) { dash.classList.remove('hidden'); dash.style.display = 'block'; }
   document.getElementById('btnSellerLogout')?.classList.remove('hidden');
   const nameEl = document.getElementById('sellerNameDisplay');
   if (nameEl) nameEl.textContent = user.displayName || user.email || 'Seller';
@@ -160,10 +174,12 @@ function showDashboard(user) {
 }
 
 function showAuthGate() {
-  document.getElementById('authConnectingState')?.classList.add('hidden');
-  document.getElementById('authSection')?.classList.remove('hidden');
+  const loading = document.getElementById('authConnectingState');
+  if (loading) { loading.classList.add('hidden'); loading.style.display = 'none'; }
+  const authSec = document.getElementById('authSection');
+  if (authSec) { authSec.classList.remove('hidden'); authSec.style.display = 'flex'; }
   const dash = document.getElementById('dashboardSection');
-  if (dash) { dash.style.display = 'none'; }
+  if (dash) { dash.classList.add('hidden'); dash.style.display = 'none'; }
   document.getElementById('btnSellerLogout')?.classList.add('hidden');
 }
 
@@ -215,6 +231,14 @@ async function loadOrCreateShop(user) {
   } catch (err) {
     console.error('[Seller] loadOrCreateShop error:', err);
     showToast('Error loading shop profile from Firestore: ' + err.message, 'error');
+    if (!currentShop) {
+      currentShop = { id: user.uid, ownerUid: user.uid, sellerUid: user.uid, name: user.displayName || 'Local Shop' };
+    }
+    listenToSellerProducts(user.uid);
+    listenToSellerOrders(user.uid, user.uid);
+  } finally {
+    const loading = document.getElementById('authConnectingState');
+    if (loading) { loading.classList.add('hidden'); loading.style.display = 'none'; }
   }
 }
 

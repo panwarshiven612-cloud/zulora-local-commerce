@@ -93,6 +93,10 @@ function setupEventListeners() {
     closeMenuDrawer();
     openAboutModal();
   });
+  document.getElementById('menuItemPolicy')?.addEventListener('click', () => {
+    closeMenuDrawer();
+    openPolicyModal();
+  });
   document.getElementById('menuItemTerms')?.addEventListener('click', () => {
     closeMenuDrawer();
     openTermsModal();
@@ -135,6 +139,8 @@ function setupEventListeners() {
   // Informational Modals
   document.getElementById('btnCloseTermsModal')?.addEventListener('click', closeTermsModal);
   document.getElementById('btnAgreeTerms')?.addEventListener('click', closeTermsModal);
+  document.getElementById('btnClosePolicyModal')?.addEventListener('click', closePolicyModal);
+  document.getElementById('btnAgreePolicy')?.addEventListener('click', closePolicyModal);
   document.getElementById('btnCloseSettingsModal')?.addEventListener('click', closeSettingsModal);
   document.getElementById('btnSettingsSignOut')?.addEventListener('click', async () => {
     closeSettingsModal();
@@ -161,6 +167,19 @@ function setupEventListeners() {
     } else {
       showToast('Notification permission was not granted.', 'info');
     }
+  });
+
+  // Notification preference toggles
+  ['prefOrderNotifs', 'prefCartReminders', 'prefLocalDeals'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      const prefs = {
+        orders: document.getElementById('prefOrderNotifs')?.checked ?? true,
+        cart: document.getElementById('prefCartReminders')?.checked ?? true,
+        deals: document.getElementById('prefLocalDeals')?.checked ?? true
+      };
+      try { localStorage.setItem('zulora_notif_prefs', JSON.stringify(prefs)); } catch (_) {}
+      showToast('Notification preferences saved.', 'info');
+    });
   });
   document.getElementById('btnCloseAboutUsModal')?.addEventListener('click', closeAboutModal);
 
@@ -318,11 +337,29 @@ function closeTermsModal() {
 }
 window.openTermsModal = openTermsModal;
 
+function openPolicyModal() {
+  document.getElementById('policyModal')?.classList.add('open');
+}
+function closePolicyModal() {
+  document.getElementById('policyModal')?.classList.remove('open');
+}
+window.openPolicyModal = openPolicyModal;
+
 function openSettingsModal() {
   const locDesc = document.getElementById('settingsLocationDesc');
   if (locDesc) {
     locDesc.textContent = (userLocation && userLocation.town) ? `Current: ${userLocation.town}` : 'Current: All Locations';
   }
+  try {
+    const raw = localStorage.getItem('zulora_notif_prefs');
+    const prefs = raw ? JSON.parse(raw) : { orders: true, cart: true, deals: true };
+    const elOrders = document.getElementById('prefOrderNotifs');
+    const elCart = document.getElementById('prefCartReminders');
+    const elDeals = document.getElementById('prefLocalDeals');
+    if (elOrders) elOrders.checked = prefs.orders !== false;
+    if (elCart) elCart.checked = prefs.cart !== false;
+    if (elDeals) elDeals.checked = prefs.deals !== false;
+  } catch (_) {}
   document.getElementById('settingsModal')?.classList.add('open');
 }
 function closeSettingsModal() {
@@ -755,24 +792,46 @@ window.openCheckoutModal = function() {
     const shopTotal = group.grandTotal;
     const upiId = shop.upiId || '';
     const hasCustomQr = Boolean(shop.upiQrImageUrl);
+    const cleanPhone = (shop.phone || '').replace(/[^0-9]/g, '');
+    const callUrl = cleanPhone ? `tel:+91${cleanPhone}` : '';
 
     return `
-      <div class="checkout-upi-box">
-        <div style="font-size:0.85rem;font-weight:800;margin-bottom:0.25rem;color:var(--slate-900);">${escapeHtml(shop.name || 'Seller')}</div>
-        <div style="font-size:1.05rem;font-weight:900;color:var(--azure-800);margin-bottom:0.25rem;">₹${shopTotal.toFixed(2)}</div>
+      <div class="checkout-upi-box" style="margin-bottom:0.75rem;padding:0.85rem;background:#f8fafc;border:1px solid var(--border-subtle);border-radius:var(--radius-md);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.4rem;">
+          <div>
+            <div style="font-size:0.9rem;font-weight:800;color:var(--slate-900);display:flex;align-items:center;gap:0.3rem;">
+              🏪 ${escapeHtml(shop.name || 'Local Seller')}
+              ${shop.isVerified ? `<img src="${PLATFORM_CONSTANTS.VERIFIED_BADGE_URL}" alt="✓" class="verified-badge-sm" style="width:15px;height:15px;display:inline-block;" />` : ''}
+            </div>
+            <div style="font-size:0.75rem;color:var(--slate-600);margin-top:0.15rem;">
+              📞 Merchant Contact: ${callUrl ? `<a href="${callUrl}" style="color:var(--azure-700);font-weight:700;">+91 ${escapeHtml(shop.phone)}</a>` : '<span style="color:var(--slate-400);">Available after order</span>'}
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:1.15rem;font-weight:900;color:var(--azure-800);">₹${shopTotal.toFixed(2)}</div>
+            <div style="font-size:0.72rem;color:var(--slate-400);">${group.items.length} item${group.items.length > 1 ? 's' : ''}</div>
+          </div>
+        </div>
+
+        <!-- Distance & Pricing breakdown -->
+        <div style="font-size:0.75rem;background:#fff;border:1px dashed var(--slate-200);padding:0.4rem 0.6rem;border-radius:var(--radius-sm);margin-bottom:0.5rem;color:var(--slate-600);">
+          📍 <strong>${group.distKm != null ? `${group.distKm} km away` : 'Local Store'}</strong> (₹${group.perKmRate || 15}/km delivery rate) • Min Order: ₹50<br/>
+          Fee: ₹${group.baseFee || 15} base + ₹${group.weightFee || 0} weight surcharge (${group.totalWeightKg.toFixed(1)}kg) • Merchant Self-Delivery
+        </div>
+
         ${hasCustomQr
           ? `<img src="${escapeHtml(shop.upiQrImageUrl)}" alt="Seller UPI QR Code" style="width:140px;height:140px;margin:0.5rem auto;display:block;border-radius:var(--radius-sm);border:1px solid var(--border-subtle);" />`
           : ''
         }
         ${upiId
-          ? `<div style="margin-top:0.4rem;">
-               <div style="font-size:0.74rem;color:var(--slate-500);margin-bottom:0.25rem;">UPI ID to pay:</div>
-               <div class="checkout-upi-id-pill">
-                 <span class="checkout-upi-id-text">${escapeHtml(upiId)}</span>
-                 <button onclick="navigator.clipboard.writeText('${escapeHtml(upiId)}').then(()=>{ alert('✓ UPI ID copied to clipboard!'); })" style="background:none;border:none;cursor:pointer;font-size:0.85rem;" title="Copy UPI ID">📋</button>
+          ? `<div style="margin-top:0.4rem;text-align:center;">
+               <div style="font-size:0.72rem;color:var(--slate-500);margin-bottom:0.2rem;">Pay directly to seller via UPI:</div>
+               <div class="checkout-upi-id-pill" style="display:inline-flex;align-items:center;gap:0.4rem;background:#fff;padding:0.25rem 0.65rem;border:1px solid var(--border-subtle);border-radius:var(--radius-full);">
+                 <span class="checkout-upi-id-text" style="font-weight:700;font-size:0.82rem;color:var(--azure-900);">${escapeHtml(upiId)}</span>
+                 <button type="button" onclick="navigator.clipboard.writeText('${escapeHtml(upiId)}').then(()=>{ alert('✓ UPI ID copied to clipboard!'); })" style="background:none;border:none;cursor:pointer;font-size:0.85rem;" title="Copy UPI ID">📋</button>
                </div>
              </div>`
-          : `<div style="font-size:0.78rem;color:var(--slate-500);margin-top:0.35rem;">Contact merchant for direct UPI transfer.</div>`
+          : `<div style="font-size:0.75rem;color:var(--slate-500);margin-top:0.35rem;text-align:center;">Merchant accepts Cash on Delivery &amp; in-person UPI upon arrival.</div>`
         }
       </div>
     `;
@@ -794,8 +853,19 @@ window.openCheckoutModal = function() {
         <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">Mobile Phone *</label>
         <input id="coPhone" type="tel" placeholder="+91 XXXXXXXXXX" value="${escapeHtml(userLocation?.phone || '')}" style="width:100%;margin-bottom:0.65rem;padding:0.55rem;border:1px solid var(--border-subtle);border-radius:var(--radius-md);font-size:0.88rem;" />
 
-        <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">Delivery Address / Landmark *</label>
-        <textarea id="coAddress" rows="2" placeholder="House no, street, town, landmark" style="width:100%;margin-bottom:0.65rem;padding:0.55rem;border:1px solid var(--border-subtle);border-radius:var(--radius-md);font-size:0.88rem;">${escapeHtml(userLocation?.address || userLocation?.town || '')}</textarea>
+        <div style="display:flex;gap:0.6rem;margin-bottom:0.65rem;">
+          <div style="flex:1;">
+            <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">City / Town / Village *</label>
+            <input id="coCityTown" type="text" placeholder="e.g. Haldwani" value="${escapeHtml(userLocation?.town && userLocation.town !== 'All Locations' ? userLocation.town : '')}" style="width:100%;padding:0.55rem;border:1px solid var(--border-subtle);border-radius:var(--radius-md);font-size:0.88rem;" />
+          </div>
+          <div style="flex:1;">
+            <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">State / Region</label>
+            <input id="coState" type="text" placeholder="e.g. Uttarakhand" value="${escapeHtml(userLocation?.region || '')}" style="width:100%;padding:0.55rem;border:1px solid var(--border-subtle);border-radius:var(--radius-md);font-size:0.88rem;" />
+          </div>
+        </div>
+
+        <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">Delivery Address / Street / House No. / Landmark *</label>
+        <textarea id="coAddress" rows="2" placeholder="House no, street name, nearest landmark" style="width:100%;margin-bottom:0.65rem;padding:0.55rem;border:1px solid var(--border-subtle);border-radius:var(--radius-md);font-size:0.88rem;">${escapeHtml(userLocation?.street || userLocation?.address || '')}</textarea>
 
         <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">Payment Option *</label>
         <div style="display:flex;gap:1.5rem;margin-bottom:0.85rem;">
@@ -819,8 +889,8 @@ window.openCheckoutModal = function() {
           <strong style="font-size:1.15rem;color:var(--azure-800);">₹${grandTotal.toFixed(2)}</strong>
         </div>
 
-        <p style="font-size:0.72rem;color:var(--slate-500);text-align:center;margin:0;">
-          By placing an order, you agree to the <a href="#" onclick="window.openTermsModal();return false;" style="color:var(--azure-600);text-decoration:underline;font-weight:700;">Zulora Terms & Conditions</a> and Merchant Self-Delivery Policy.
+        <p style="font-size:0.74rem;color:var(--slate-500);text-align:center;margin:0;line-height:1.5;">
+          By placing an order, you agree to the <a href="#" onclick="window.openPolicyModal();return false;" style="color:var(--azure-700);text-decoration:underline;font-weight:700;">Zulora Local Policy</a> and <a href="#" onclick="window.openTermsModal();return false;" style="color:var(--azure-700);text-decoration:underline;font-weight:700;">Terms &amp; Conditions</a> (Self-Delivery, Min ₹50, Direct UPI/COD).
         </p>
       </div>
       <div class="modal-footer" style="display:flex;justify-content:space-between;">
@@ -849,12 +919,17 @@ window.executeOrderPlacement = async function() {
   const name = document.getElementById('coName')?.value.trim();
   const phone = document.getElementById('coPhone')?.value.trim();
   const address = document.getElementById('coAddress')?.value.trim();
+  const cityTown = document.getElementById('coCityTown')?.value.trim();
+  const state = document.getElementById('coState')?.value.trim();
   const paymentEl = document.querySelector('input[name="coPayment"]:checked');
   const payment = paymentEl?.value || 'COD';
 
   if (!name) { showToast('Please enter your name.', 'warning'); return; }
   if (!phone || phone.length < 7) { showToast('Please enter a valid phone number.', 'warning'); return; }
-  if (!address) { showToast('Please enter your delivery address.', 'warning'); return; }
+  if (!cityTown) { showToast('Please enter your City / Town / Village name.', 'warning'); return; }
+  if (!address) { showToast('Please enter your delivery street or landmark address.', 'warning'); return; }
+
+  const fullDeliveryAddress = `${address}, ${cityTown}${state ? ', ' + state : ''}`;
 
   const groups = groupCartByShop(allShops, userLocation);
   const anyBelow = Object.values(groups).find(g => g.isBelowMinOrder);
@@ -875,15 +950,15 @@ window.executeOrderPlacement = async function() {
       orderId: generatedOrderCode,
       buyerName: name,
       buyerPhone: phone,
-      buyerAddress: address,
+      buyerAddress: fullDeliveryAddress,
       buyerUid: currentUser?.uid || 'guest',
       buyerEmail: currentUser?.email || '',
-      buyerCityTown: userLocation?.town || '',
-      buyerState: userLocation?.region || '',
+      buyerCityTown: cityTown,
+      buyerState: state || userLocation?.region || '',
       buyerCoords: (userLocation?.lat != null && userLocation?.lng != null)
         ? { lat: userLocation.lat, lng: userLocation.lng }
         : null,
-      sellerUid: group.shop.sellerUid || group.shop.ownerUid || group.shop.ownerId || shopId,
+      sellerUid: group.shop.sellerUid || group.shop.ownerUid || group.shop.ownerId || group.items[0]?.product?.sellerUid || shopId,
       shopId,
       shopName: group.shop.name || 'Local Seller',
       shopPhone: group.shop.phone || '',
