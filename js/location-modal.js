@@ -97,14 +97,14 @@ export function openLocationSetupModal({
   // GPS Auto-detect
   const gpsBtn = modal.querySelector('#modalBtnGps');
   gpsBtn?.addEventListener('click', async () => {
-    gpsBtn.textContent = '⏳ Detecting…';
+    gpsBtn.textContent = '⏳ Detecting & resolving city name…';
     try {
       const loc = await getCurrentGpsPosition();
       const newLoc = { ...(currentLocation || {}), ...loc };
       saveUserLocation(newLoc);
       if (onLocationSaved) onLocationSaved(newLoc);
       await syncLocationToFirestore(newLoc, currentUser, db, isConfigPlaceholder);
-      showToast('📍 GPS Location saved!', 'success');
+      showToast(`📍 Location set to "${loc.town || 'your area'}"`, 'success');
       modal.remove();
     } catch (e) {
       showToast(e.message || 'Could not detect GPS location. Please enter manually.', 'warning');

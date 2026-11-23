@@ -117,6 +117,10 @@ function setupEventListeners() {
   document.getElementById('btnCloseTermsModal')?.addEventListener('click', closeTermsModal);
   document.getElementById('btnAgreeTerms')?.addEventListener('click', closeTermsModal);
   document.getElementById('btnCloseSettingsModal')?.addEventListener('click', closeSettingsModal);
+  document.getElementById('btnSettingsSignOut')?.addEventListener('click', async () => {
+    closeSettingsModal();
+    await handleSignOutAction();
+  });
   document.getElementById('btnSettingsChangeLocation')?.addEventListener('click', () => {
     closeSettingsModal();
     openLocationSetupModal({
@@ -325,7 +329,7 @@ function updateLocationUI() {
   const topEl = document.getElementById('topLocationText');
 
   const displayText = (userLocation && userLocation.town && userLocation.town !== 'All Locations')
-    ? userLocation.town
+    ? (userLocation.region ? `${userLocation.town}, ${userLocation.region}` : userLocation.town)
     : ((userLocation && userLocation.lat != null) ? `${userLocation.lat.toFixed(3)}, ${userLocation.lng.toFixed(3)}` : 'Set Location');
 
   if (topEl) topEl.textContent = displayText;
@@ -341,6 +345,10 @@ async function handleSignInAction() {
 }
 
 async function handleSignOutAction() {
+  const step1 = confirm('Are you sure you want to sign out of Zulora Local?');
+  if (!step1) return;
+  const step2 = confirm('Final confirmation: Sign out now? Your cart items will be saved locally.');
+  if (!step2) return;
   await signOutUser();
 }
 
@@ -799,6 +807,10 @@ window.executeOrderPlacement = async function() {
       buyerPhone: phone,
       buyerAddress: address,
       buyerUid: currentUser?.uid || 'guest',
+      buyerEmail: currentUser?.email || '',
+      buyerCityTown: userLocation?.town || '',
+      buyerState: userLocation?.region || '',
+      sellerUid: group.shop.sellerUid || group.shop.ownerUid || group.shop.ownerId || '',
       shopId,
       shopName: shop.name || 'Local Seller',
       sellerPhone: shop.phone || '',

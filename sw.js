@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zulora-local-v5';
+const CACHE_NAME = 'zulora-local-v6';
 const STATIC_ASSETS = [
   './',
   './index.html',

@@ -14,7 +14,7 @@ import {
 import { uploadMultipleImages, uploadSingleImage } from './cloudinary.js';
 import { getCurrentGpsPosition } from './geo-pricing.js';
 import { PLATFORM_CONSTANTS } from './config.js';
-import { showToast } from './notifications.js';
+import { showToast, triggerBrowserNotification } from './notifications.js';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentSeller = null;
@@ -108,6 +108,10 @@ async function handleSellerLogin() {
 }
 
 async function handleSellerLogout() {
+  const step1 = confirm('Are you sure you want to log out of Seller Mode?');
+  if (!step1) return;
+  const step2 = confirm('Final check: Log out now? Your shop will stay saved on Zulora.');
+  if (!step2) return;
   try {
     if (unsubscribeOrders) { unsubscribeOrders(); unsubscribeOrders = null; }
     if (unsubscribeProducts) { unsubscribeProducts(); unsubscribeProducts = null; }
@@ -158,6 +162,7 @@ async function loadOrCreateShop(user) {
 
       const initial = {
         ownerUid: user.uid,
+        sellerUid: user.uid,
         ownerEmail: user.email || '',
         name: user.displayName ? `${user.displayName}'s Shop` : 'Local Shop',
         handle: `@${rawHandle}`,
@@ -622,6 +627,8 @@ window.deleteProductItem = async function(prodId) {
 };
 
 // ─── Real Live Orders Listener ────────────────────────────────────────────────
+let _prevOrderCount = -1; // track new order arrivals for browser notification
+
 function listenToSellerOrders(shopId, sellerUid) {
   if (unsubscribeOrders) unsubscribeOrders();
   if (!db || isConfigPlaceholder) return;
@@ -633,10 +640,23 @@ function listenToSellerOrders(shopId, sellerUid) {
   );
 
   unsubscribeOrders = onSnapshot(q, (snapshot) => {
-    liveOrders = [];
+    const newOrders = [];
     snapshot.forEach(d => {
-      liveOrders.push({ id: d.id, ...d.data() });
+      newOrders.push({ id: d.id, ...d.data() });
     });
+
+    // Trigger browser notification when a NEW order arrives (count increased)
+    if (_prevOrderCount >= 0 && newOrders.length > _prevOrderCount) {
+      const newest = newOrders[0];
+      triggerBrowserNotification(
+        '🛒 New Order on Zulora Local!',
+        `Order #${newest.orderId || newest.id} from ${newest.buyerName || 'a customer'} — ₹${newest.totalAmount || newest.grandTotal || 0}`,
+        './seller.html'
+      );
+    }
+    _prevOrderCount = newOrders.length;
+
+    liveOrders = newOrders;
     renderSellerOrders();
     updateDashboardStats();
   }, (err) => {

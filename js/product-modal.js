@@ -24,11 +24,7 @@ export function openProductDetailModal({
     ? product.images
     : (product.imageUrl ? [product.imageUrl] : ['https://via.placeholder.com/400x400?text=Product+Image']);
 
-  const cleanPhone = (shop.phone || '').replace(/[^0-9]/g, '');
-  const callUrl = cleanPhone ? `tel:+91${cleanPhone}` : `tel:${PLATFORM_CONSTANTS.HELPLINE_PHONE}`;
-  const waPhone = cleanPhone ? (cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone) : PLATFORM_CONSTANTS.HELPLINE_WHATSAPP;
-  const waMsg = encodeURIComponent(`Hi ${shop.name || 'Seller'}, I am interested in ordering "${product.title}" on Zulora Local.`);
-  const waUrl = `https://wa.me/${waPhone}?text=${waMsg}`;
+  // Pre-order: seller contact is hidden — shown only after order placement on orders.html
 
   const distKm = (userLocation?.lat != null && shop.lat != null)
     ? calculateHaversineDistance(userLocation.lat, userLocation.lng, shop.lat, shop.lng)
@@ -121,9 +117,9 @@ export function openProductDetailModal({
             <span>📊 <strong>Availability:</strong> ${outOfStock ? '<strong style="color:var(--rose-600);">Out of Stock</strong>' : `<strong>${product.stock} items left in stock</strong>`}</span>
           </div>
 
-          <!-- 2 Clean Action Cards / Buttons -->
+          <!-- 2 Clean Action Cards: Cart + View Store (contact hidden pre-order) -->
           <div class="product-modal-actions">
-            <div id="modalCartActionWrap" style="flex:1.2;">
+            <div id="modalCartActionWrap" style="flex:1.5;">
               ${outOfStock
                 ? `<button class="btn btn-add-cart btn-out-of-stock" disabled style="width:100%;padding:0.65rem;">Out of Stock</button>`
                 : cartQty > 0
@@ -138,14 +134,15 @@ export function openProductDetailModal({
               }
             </div>
 
-            <div style="display:flex;gap:0.4rem;flex:1;">
-              <a href="${callUrl}" class="btn btn-secondary" style="flex:1;padding:0.65rem 0.5rem;font-size:0.8rem;" title="Call Store">
-                📞 Call
-              </a>
-              <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp" style="flex:1;padding:0.65rem 0.5rem;font-size:0.8rem;" title="WhatsApp Store">
-                💬 WhatsApp
+            <div style="flex:1;">
+              <a href="./orders.html" class="btn btn-secondary" style="width:100%;padding:0.65rem 0.5rem;font-size:0.8rem;text-align:center;display:flex;align-items:center;justify-content:center;gap:0.3rem;" title="Track Orders">
+                📦 My Orders
               </a>
             </div>
+          </div>
+
+          <div style="margin-top:0.6rem;font-size:0.72rem;color:var(--slate-400);text-align:center;">
+            🔒 Seller contact is shown after placing your order
           </div>
         </div>
       </div>

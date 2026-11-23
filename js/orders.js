@@ -9,7 +9,7 @@ import {
   collection, doc, getDoc, updateDoc, serverTimestamp, query, where, orderBy, onSnapshot, isConfigPlaceholder
 } from './firebase-init.js';
 import { PLATFORM_CONSTANTS } from './config.js';
-import { addNotification, loadSavedNotifications, notifyOrderStatus, showToast } from './notifications.js';
+import { addNotification, loadSavedNotifications, notifyOrderStatus, showToast, triggerBrowserNotification } from './notifications.js';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 let currentUser  = null;
@@ -89,6 +89,18 @@ function listenToLiveOrders(buyerUid) {
       const prev = prevStatuses[d.id];
       if (prev && prev !== order.orderStatus) {
         notifyOrderStatus(order.orderId || d.id, order.orderStatus);
+        // Also fire browser push notification for status changes
+        const statusMsgs = {
+          'Approved / Confirmed': `✅ Your order #${order.orderId || d.id} has been accepted by the seller!`,
+          'Accepted & Packing': `✅ Seller is packing your order #${order.orderId || d.id}!`,
+          'Packed / Out for Delivery': `🛵 Order #${order.orderId || d.id} is out for delivery!`,
+          'Out for Delivery': `🛵 Order #${order.orderId || d.id} is out for delivery!`,
+          'Delivered': `🎉 Order #${order.orderId || d.id} delivered! Confirm receipt on Zulora.`,
+        };
+        const pushMsg = statusMsgs[order.orderStatus];
+        if (pushMsg) {
+          triggerBrowserNotification('Zulora Local — Order Update', pushMsg, './orders.html');
+        }
       }
       prevStatuses[d.id] = order.orderStatus;
       userOrders.push(order);

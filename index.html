@@ -375,33 +375,80 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════
-       SETTINGS MODAL
+       SETTINGS MODAL — Expanded v2
   ═══════════════════════════════════════════════ -->
   <div id="settingsModal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Settings">
-    <div class="modal-box" style="max-width:480px;">
+    <div class="modal-box" style="max-width:500px;">
       <div class="modal-header">
-        <h3 style="font-size:1.1rem;font-weight:800;color:var(--slate-900);">⚙️ App &amp; Notification Settings</h3>
+        <h3 style="font-size:1.1rem;font-weight:800;color:var(--slate-900);">⚙️ App Settings</h3>
         <button id="btnCloseSettingsModal" class="btn btn-icon" aria-label="Close">✕</button>
       </div>
-      <div class="modal-body" style="font-size:0.85rem;color:var(--slate-700);">
-        <div style="margin-bottom:1.25rem;">
-          <h4 style="font-size:0.95rem;font-weight:700;margin-bottom:0.35rem;">📍 Delivery Location</h4>
+      <div class="modal-body" style="font-size:0.85rem;color:var(--slate-700);padding:0 1rem 1rem;">
+
+        <!-- Account & Profile -->
+        <div style="margin-bottom:1.1rem;padding-top:0.75rem;">
+          <h4 style="font-size:0.9rem;font-weight:800;margin-bottom:0.35rem;color:var(--azure-800);">👤 Account &amp; Profile</h4>
+          <p style="font-size:0.8rem;color:var(--slate-500);margin-bottom:0.4rem;">Signed in via Google. No passwords. No SMS OTP.</p>
+          <a href="./seller.html" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:0.3rem;">
+            🏪 Open Seller Studio / My Shop
+          </a>
+        </div>
+
+        <!-- Notification Preferences -->
+        <div style="margin-bottom:1.1rem;border-top:1px solid var(--slate-100);padding-top:0.9rem;">
+          <h4 style="font-size:0.9rem;font-weight:800;margin-bottom:0.35rem;color:var(--azure-800);">🔔 Notification Preferences</h4>
+          <p style="font-size:0.8rem;color:var(--slate-500);margin-bottom:0.5rem;">Get live order updates, cart reminders, and local deal alerts in your browser.</p>
+          <button id="btnSettingsEnablePush" class="btn btn-primary btn-sm" style="margin-bottom:0.4rem;">
+            Enable Browser Push Notifications
+          </button>
+        </div>
+
+        <!-- Location & Address -->
+        <div style="margin-bottom:1.1rem;border-top:1px solid var(--slate-100);padding-top:0.9rem;">
+          <h4 style="font-size:0.9rem;font-weight:800;margin-bottom:0.35rem;color:var(--azure-800);">📍 Location &amp; Delivery Address</h4>
           <p style="font-size:0.8rem;color:var(--slate-500);margin-bottom:0.5rem;" id="settingsLocationDesc">Current: All Locations (Worldwide)</p>
           <button id="btnSettingsChangeLocation" class="btn btn-secondary btn-sm">✏️ Update Location &amp; Address</button>
         </div>
 
-        <div style="margin-bottom:1.25rem;border-top:1px solid var(--slate-100);padding-top:1rem;">
-          <h4 style="font-size:0.95rem;font-weight:700;margin-bottom:0.35rem;">🔔 Push &amp; Order Notifications</h4>
-          <p style="font-size:0.8rem;color:var(--slate-500);margin-bottom:0.5rem;">Receive live updates when merchants accept your order and when delivery arrives.</p>
-          <button id="btnSettingsEnablePush" class="btn btn-primary btn-sm">Enable Browser Push Notifications</button>
+        <!-- Zulora Ecosystem -->
+        <div style="margin-bottom:1.1rem;border-top:1px solid var(--slate-100);padding-top:0.9rem;">
+          <h4 style="font-size:0.9rem;font-weight:800;margin-bottom:0.5rem;color:var(--azure-800);">🌐 Zulora Ecosystem</h4>
+          <div style="display:flex;flex-direction:column;gap:0.3rem;">
+            <a href="https://zulora.in" target="_blank" rel="noopener noreferrer" style="font-size:0.82rem;color:var(--azure-700);font-weight:700;">🤖 Zulora AI — zulora.in ↗</a>
+            <a href="https://drive.zulora.in" target="_blank" rel="noopener noreferrer" style="font-size:0.82rem;color:var(--azure-700);font-weight:700;">☁️ Zulora Cloud Drive — drive.zulora.in ↗</a>
+            <a href="https://school.zulora.in" target="_blank" rel="noopener noreferrer" style="font-size:0.82rem;color:var(--azure-700);font-weight:700;">🎓 Zulora School — school.zulora.in ↗</a>
+          </div>
         </div>
 
-        <div style="border-top:1px solid var(--slate-100);padding-top:1rem;">
-          <h4 style="font-size:0.95rem;font-weight:700;margin-bottom:0.35rem;">🌐 Zulora Local Ecosystem</h4>
-          <p style="font-size:0.8rem;color:var(--slate-500);">Operating with 100% free static hosting on Vercel + Firebase Spark Plan + Cloudinary.</p>
+        <!-- About Zulora Local -->
+        <div style="margin-bottom:1.1rem;border-top:1px solid var(--slate-100);padding-top:0.9rem;">
+          <h4 style="font-size:0.9rem;font-weight:800;margin-bottom:0.35rem;color:var(--azure-800);">ℹ️ About Zulora Local</h4>
+          <p style="font-size:0.8rem;color:var(--slate-500);line-height:1.5;">Version 3.0 • 100% free on Vercel + Firebase Spark + Cloudinary. Built by Zulora AI to empower neighbourhood merchants.</p>
+        </div>
+
+        <!-- Terms & Conditions -->
+        <div style="margin-bottom:1.1rem;border-top:1px solid var(--slate-100);padding-top:0.9rem;">
+          <h4 style="font-size:0.9rem;font-weight:800;margin-bottom:0.35rem;color:var(--azure-800);">📜 Terms &amp; Conditions</h4>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('settingsModal').classList.remove('open');window.openTermsModal();">
+            Read Terms &amp; Conditions →
+          </button>
+        </div>
+
+        <!-- Helpline -->
+        <div style="border-top:1px solid var(--slate-100);padding-top:0.9rem;margin-bottom:0.5rem;">
+          <h4 style="font-size:0.9rem;font-weight:800;margin-bottom:0.5rem;color:var(--azure-800);">📞 Helpline &amp; Support</h4>
+          <div style="display:flex;flex-direction:column;gap:0.3rem;">
+            <a href="mailto:zulora.help@gmail.com" style="font-size:0.82rem;color:var(--azure-700);font-weight:700;">📧 zulora.help@gmail.com</a>
+            <a href="tel:+916395211325" style="font-size:0.82rem;color:var(--azure-700);font-weight:700;">📞 +91 6395211325</a>
+            <a href="https://wa.me/916395211325" target="_blank" rel="noopener noreferrer" style="font-size:0.82rem;color:var(--emerald-700);font-weight:700;">💬 WhatsApp Support ↗</a>
+          </div>
         </div>
       </div>
-      <div class="modal-footer" style="display:flex;justify-content:flex-end;">
+
+      <div class="modal-footer" style="display:flex;justify-content:space-between;gap:0.5rem;">
+        <button id="btnSettingsSignOut" class="btn btn-ghost" style="color:var(--rose-600);border-color:var(--rose-200);">
+          🚪 Sign Out
+        </button>
         <button class="btn btn-ghost" onclick="document.getElementById('settingsModal').classList.remove('open')">Close</button>
       </div>
     </div>

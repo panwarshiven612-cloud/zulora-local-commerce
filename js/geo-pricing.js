@@ -44,20 +44,66 @@ export function calculateDeliveryFeeAndMinOrder(distKm, totalWeightKg = 0.5) {
   };
 }
 
-export function getCurrentGpsPosition() {
+// Cache reverse geocode result per session to avoid repeat API calls
+let _geoCache = null;
+
+/**
+ * Calls Nominatim (OpenStreetMap) reverse geocoder.
+ * Returns { town, region, country } or null on failure.
+ * Rate limit: 1 req/sec — cached per session.
+ */
+async function reverseGeocode(lat, lng) {
+  if (_geoCache && _geoCache.lat === lat && _geoCache.lng === lng) return _geoCache.result;
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': 'ZuloraLocal/1.0 (zulora.help@gmail.com)' }
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const addr = data.address || {};
+    const town = addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state_district || '';
+    const region = addr.state || addr.region || '';
+    const country = addr.country || '';
+    const result = { town: town || `${lat.toFixed(4)}, ${lng.toFixed(4)}`, region, country };
+    _geoCache = { lat, lng, result };
+    return result;
+  } catch (e) {
+    console.warn('[GeoCode] Nominatim reverse geocode failed:', e);
+    return null;
+  }
+}
+
+export async function getCurrentGpsPosition() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('Geolocation is not supported by your browser.'));
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      p => resolve({
-        lat: p.coords.latitude,
-        lng: p.coords.longitude,
-        accuracy: p.coords.accuracy,
-        town: `${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}`,
-        isManual: false
-      }),
+      async p => {
+        const lat = p.coords.latitude;
+        const lng = p.coords.longitude;
+        const accuracy = p.coords.accuracy;
+        // Try to resolve real city/town name first
+        try {
+          const geo = await reverseGeocode(lat, lng);
+          resolve({
+            lat, lng, accuracy,
+            town: geo ? geo.town : `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+            region: geo ? geo.region : '',
+            country: geo ? geo.country : '',
+            isManual: false
+          });
+        } catch (_) {
+          resolve({
+            lat, lng, accuracy,
+            town: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+            region: '', country: '',
+            isManual: false
+          });
+        }
+      },
       err => {
         const saved = getSavedUserLocation();
         if (saved && saved.lat != null) resolve(saved);

@@ -134,6 +134,11 @@ export function buildProductCardHtml(product, shop = {}, userLocation = null, ca
     : null;
   const distLabel = distKm != null ? `📍 ${distKm} km` : '📍 Local';
   const timeLabel = `⚡ ${getEstimatedDeliveryTime(distKm)}`;
+  const deliveryRadius = shop.deliveryRadiusKm ?? PLATFORM_CONSTANTS.DEFAULT_DELIVERY_RADIUS_KM;
+  const inRadius = distKm != null ? distKm <= deliveryRadius : true;
+  const radiusBadgeHtml = distKm != null
+    ? `<span style="font-size:0.65rem;font-weight:700;color:${inRadius ? '#065f46' : '#991b1b'};background:${inRadius ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)'};border:1px solid ${inRadius ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'};border-radius:4px;padding:0.1rem 0.4rem;">${inRadius ? `✓ Within ${deliveryRadius}km` : `⚠ ${distKm}km (${deliveryRadius}km radius)`}</span>`
+    : '';
 
   const hasDiscount = product.mrp && product.mrp > product.price;
   const discountPct = hasDiscount ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : 0;
@@ -187,26 +192,28 @@ export function buildProductCardHtml(product, shop = {}, userLocation = null, ca
         </span>
       </div>
 
-      <div style="padding:0.75rem;display:flex;flex-direction:column;flex:1;">
-        <div style="display:flex;align-items:center;gap:0.25rem;margin-bottom:0.2rem;">
-          <span style="font-size:0.72rem;font-weight:700;color:var(--azure-800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+      <div style="padding:0.9rem;display:flex;flex-direction:column;flex:1;">
+        <div style="display:flex;align-items:center;gap:0.25rem;margin-bottom:0.25rem;">
+          <span style="font-size:0.75rem;font-weight:700;color:var(--azure-800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             ${escapeHtml(shop.name || 'Local Seller')}
           </span>
           ${verifiedBadgeHtml}
         </div>
 
-        <h3 style="font-size:0.88rem;font-weight:800;color:var(--slate-900);line-height:1.25;margin-bottom:0.2rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;height:2.2em;">
+        <h3 style="font-size:0.95rem;font-weight:800;color:var(--slate-900);line-height:1.25;margin-bottom:0.25rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;height:2.4em;">
           ${escapeHtml(product.title)}
         </h3>
 
-        <div style="font-size:0.72rem;color:var(--slate-400);margin-bottom:0.35rem;">
+        <div style="font-size:0.73rem;color:var(--slate-400);margin-bottom:0.3rem;">
           ${escapeHtml(product.unit || '1 unit')} ${product.weightKg ? `(${product.weightKg} kg)` : ''}
         </div>
 
-        <div style="display:flex;align-items:baseline;gap:0.35rem;margin-top:auto;margin-bottom:0.45rem;">
-          <span style="font-size:1.05rem;font-weight:900;color:var(--slate-900);">₹${product.price}</span>
-          ${hasDiscount ? `<span style="font-size:0.74rem;text-decoration:line-through;color:var(--slate-400);">₹${product.mrp}</span>` : ''}
-          ${hasDiscount ? `<span style="font-size:0.7rem;font-weight:800;color:var(--emerald-600);">${discountPct}% off</span>` : ''}
+        ${radiusBadgeHtml ? `<div style="margin-bottom:0.3rem;">${radiusBadgeHtml}</div>` : ''}
+
+        <div style="display:flex;align-items:baseline;gap:0.35rem;margin-top:auto;margin-bottom:0.5rem;">
+          <span style="font-size:1.1rem;font-weight:900;color:var(--slate-900);">₹${product.price}</span>
+          ${hasDiscount ? `<span style="font-size:0.76rem;text-decoration:line-through;color:var(--slate-400);">₹${product.mrp}</span>` : ''}
+          ${hasDiscount ? `<span style="font-size:0.72rem;font-weight:800;color:var(--emerald-600);">${discountPct}% off</span>` : ''}
         </div>
 
         ${lowStock ? `<p style="font-size:0.68rem;color:var(--rose-600);font-weight:700;margin-bottom:0.3rem;">⚠️ Only ${product.stock} left!</p>` : ''}
