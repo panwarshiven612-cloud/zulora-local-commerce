@@ -23,6 +23,9 @@ export function openLocationSetupModal({
   const curRegion = currentLocation?.region || '';
   const curStreet = currentLocation?.street || '';
   const curPhone = currentLocation?.phone || currentUser?.phoneNumber || '';
+  let detectedCoords = (currentLocation?.lat != null && currentLocation?.lng != null)
+    ? { lat: currentLocation.lat, lng: currentLocation.lng, accuracy: currentLocation.accuracy }
+    : null;
 
   const modal = document.createElement('div');
   modal.id = 'locationSetupModal';
@@ -38,12 +41,22 @@ export function openLocationSetupModal({
           Select your City, Town, or Village so we can calculate exact ₹15/km delivery charges, estimated arrival times, and find nearest neighbourhood stores.
         </p>
 
-        <button id="modalBtnGps" class="btn btn-primary btn-block" style="margin-bottom:1.1rem;padding:0.75rem;font-size:0.9rem;border-radius:var(--radius-full);background:var(--azure-600);">
+        <button id="modalBtnGps" class="btn btn-primary btn-block" style="margin-bottom:0.75rem;padding:0.75rem;font-size:0.9rem;border-radius:var(--radius-full);background:var(--azure-600);">
           🛰️ Auto-Detect Current GPS Location
         </button>
 
+        <div id="gpsStatusBox" style="${detectedCoords ? '' : 'display:none;'}background:#ecfdf5;border:1.5px solid #a7f3d0;border-radius:var(--radius-md);padding:0.65rem 0.85rem;margin-bottom:0.85rem;">
+          ${detectedCoords ? `
+            <div style="font-weight:800;color:#065f46;font-size:0.82rem;">✓ Current Location Set</div>
+            <div style="font-size:0.78rem;color:#047857;margin-top:0.2rem;">
+              📍 <strong>${escapeHtml(curTown)}${curRegion ? ', ' + escapeHtml(curRegion) : ''}</strong><br/>
+              🌐 Coordinates: ${detectedCoords.lat.toFixed(5)}, ${detectedCoords.lng.toFixed(5)}
+            </div>
+          ` : ''}
+        </div>
+
         <div style="text-align:center;font-size:0.75rem;color:var(--slate-400);margin-bottom:1rem;font-weight:700;">
-          — OR ENTER CITY / VILLAGE &amp; ADDRESS —
+          — OR VERIFY / EDIT CITY, VILLAGE &amp; ADDRESS —
         </div>
 
         <div style="display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1rem;">
@@ -81,7 +94,7 @@ export function openLocationSetupModal({
           Browse All Locations
         </button>
         <button id="modalBtnSaveManual" class="btn btn-primary" style="font-weight:700;background:var(--emerald-600);border-color:var(--emerald-600);">
-          Save Location ✓
+          Confirm & Save Location ✓
         </button>
       </div>
     </div>
@@ -96,16 +109,31 @@ export function openLocationSetupModal({
 
   // GPS Auto-detect
   const gpsBtn = modal.querySelector('#modalBtnGps');
+  const gpsBox = modal.querySelector('#gpsStatusBox');
   gpsBtn?.addEventListener('click', async () => {
     gpsBtn.textContent = '⏳ Detecting & resolving city name…';
     try {
       const loc = await getCurrentGpsPosition();
-      const newLoc = { ...(currentLocation || {}), ...loc };
-      saveUserLocation(newLoc);
-      if (onLocationSaved) onLocationSaved(newLoc);
-      await syncLocationToFirestore(newLoc, currentUser, db, isConfigPlaceholder);
-      showToast(`📍 Location set to "${loc.town || 'your area'}"`, 'success');
-      modal.remove();
+      detectedCoords = { lat: loc.lat, lng: loc.lng, accuracy: loc.accuracy };
+
+      const townInput = modal.querySelector('#locTownInput');
+      const regionInput = modal.querySelector('#locRegionInput');
+      if (townInput && loc.town) townInput.value = loc.town;
+      if (regionInput && loc.region) regionInput.value = loc.region;
+
+      if (gpsBox) {
+        gpsBox.style.display = 'block';
+        gpsBox.innerHTML = `
+          <div style="font-weight:800;color:#065f46;font-size:0.82rem;">✓ GPS Coordinates Detected</div>
+          <div style="font-size:0.78rem;color:#047857;margin-top:0.2rem;">
+            📍 <strong>${escapeHtml(loc.town)}${loc.region ? ', ' + escapeHtml(loc.region) : ''}</strong><br/>
+            🌐 Coordinates: ${loc.lat.toFixed(5)}, ${loc.lng.toFixed(5)} (±${Math.round(loc.accuracy || 0)}m)
+          </div>
+          <div style="font-size:0.73rem;color:#059669;margin-top:0.35rem;">Review or adjust street / phone below, then click "Confirm & Save Location".</div>
+        `;
+      }
+      gpsBtn.textContent = '✓ GPS Detected (Click to Re-scan)';
+      showToast(`📍 Detected: ${loc.town}${loc.region ? ', ' + loc.region : ''}`, 'success');
     } catch (e) {
       showToast(e.message || 'Could not detect GPS location. Please enter manually.', 'warning');
       gpsBtn.textContent = '🛰️ Auto-Detect Current GPS Location';
@@ -132,7 +160,10 @@ export function openLocationSetupModal({
       street,
       phone,
       address: fullAddress,
-      isManual: true
+      lat: detectedCoords?.lat ?? currentLocation?.lat ?? null,
+      lng: detectedCoords?.lng ?? currentLocation?.lng ?? null,
+      accuracy: detectedCoords?.accuracy ?? currentLocation?.accuracy ?? null,
+      isManual: !detectedCoords
     };
 
     saveUserLocation(newLoc);

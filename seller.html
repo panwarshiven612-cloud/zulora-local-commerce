@@ -562,6 +562,12 @@
             </div>
           </div>
 
+          <div class="form-group">
+            <label for="shopPerKmRate">Delivery Rate (₹ per km) <span style="font-size:0.75rem;color:var(--slate-500);">Default: ₹15/km</span></label>
+            <input type="number" id="shopPerKmRate" placeholder="15" min="5" max="100" step="1" value="15" style="max-width:160px;" />
+            <p class="text-sm" style="margin-top:0.2rem;">Buyers are charged this rate × distance. First 2 kg weight free, +₹10/km per extra kg above 2 kg.</p>
+          </div>
+
           <div class="form-group form-full">
             <label for="shopDescription">Shop Description</label>
             <textarea id="shopDescription" placeholder="Tell buyers what makes your shop special…"></textarea>
@@ -573,6 +579,7 @@
               <button type="button" id="btnCaptureShopGps" class="btn-primary" style="font-size:.85rem;padding:.5rem 1.1rem;">🛰️ Capture My GPS</button>
               <input type="number" id="shopLat" placeholder="Latitude" step="any" style="width:140px;" />
               <input type="number" id="shopLng" placeholder="Longitude" step="any" style="width:140px;" />
+              <span id="shopCoordsDisplay" style="font-size:0.8rem;color:var(--slate-600);font-weight:600;"></span>
             </div>
           </div>
 

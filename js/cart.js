@@ -128,7 +128,8 @@ export function groupCartByShop(allShops = new Map(), userLocation = null) {
       ? calculateHaversineDistance(userLocation.lat, userLocation.lng, g.shop.lat, g.shop.lng)
       : null;
 
-    const deliveryRules = calculateDeliveryFeeAndMinOrder(distKm, g.totalWeightKg);
+    const perKmRate = g.shop.perKmRate || 15;
+    const deliveryRules = calculateDeliveryFeeAndMinOrder(distKm, g.totalWeightKg, perKmRate);
     g.distKm = distKm;
     g.deliveryFee = deliveryRules.deliveryFee;
     g.baseFee = deliveryRules.baseFee;
@@ -136,6 +137,7 @@ export function groupCartByShop(allShops = new Map(), userLocation = null) {
     g.extraWeightKg = deliveryRules.extraWeightKg;
     g.minOrder = deliveryRules.minOrder;
     g.deliveryTime = deliveryRules.deliveryTime;
+    g.perKmRate = perKmRate;
     g.isBelowMinOrder = g.shopTotal < g.minOrder;
     g.shortfall = Math.max(0, g.minOrder - g.shopTotal);
     g.grandTotal = g.shopTotal + g.deliveryFee;

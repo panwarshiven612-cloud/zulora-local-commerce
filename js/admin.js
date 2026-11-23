@@ -64,7 +64,18 @@ function initAdminAuth() {
     return;
   }
 
+  // Safety timeout: if onAuthStateChanged is slow or never fires, show login gate
+  let adminAuthResolved = false;
+  const adminAuthTimeout = setTimeout(() => {
+    if (!adminAuthResolved) {
+      console.warn('[Admin] Auth state timeout — showing login gate');
+      showGate();
+    }
+  }, 6000);
+
   onAuthStateChanged(auth, user => {
+    adminAuthResolved = true;
+    clearTimeout(adminAuthTimeout);
     if (user && user.email === PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL) {
       currentAdmin = user;
       grantAdminAccess(user.email);
@@ -75,6 +86,11 @@ function initAdminAuth() {
     } else {
       showGate();
     }
+  }, (err) => {
+    adminAuthResolved = true;
+    clearTimeout(adminAuthTimeout);
+    console.error('[Admin] onAuthStateChanged error:', err);
+    showGate();
   });
 }
 

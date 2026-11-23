@@ -22,10 +22,11 @@ export function getEstimatedDeliveryTime(distKm) {
   return `${mn}–${mx} mins`;
 }
 
-export function calculateDeliveryFeeAndMinOrder(distKm, totalWeightKg = 0.5) {
+export function calculateDeliveryFeeAndMinOrder(distKm, totalWeightKg = 0.5, perKmRate = 15) {
   const dist = distKm != null ? Math.max(0.5, distKm) : 1;
+  const rate = (typeof perKmRate === 'number' && !isNaN(perKmRate) && perKmRate > 0) ? perKmRate : 15;
   const minOrder = 50; // Exact minimum order is ₹50
-  const baseFee = Math.max(15, Math.round(dist * 15)); // Distance charge: ₹15 per km (minimum ₹15)
+  const baseFee = Math.max(rate, Math.round(dist * rate)); // Distance charge: customizable per km (minimum 1 km fee)
 
   // Weight rule: First 2 kg free of extra weight surcharge;
   // for extra weight above 2 kg, charge ₹10 per km for the extra weight tier
@@ -40,7 +41,8 @@ export function calculateDeliveryFeeAndMinOrder(distKm, totalWeightKg = 0.5) {
     weightFee,
     extraWeightKg: Math.round(extraWeightKg * 10) / 10,
     distKm: distKm != null ? Math.round(dist * 10) / 10 : null,
-    deliveryTime: getEstimatedDeliveryTime(distKm)
+    deliveryTime: getEstimatedDeliveryTime(distKm),
+    perKmRate: rate
   };
 }
 

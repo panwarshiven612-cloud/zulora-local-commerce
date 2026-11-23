@@ -10,3 +10,9 @@
 @import './product-cart.css';
 @import './seller-orders.css';
 @import './modals-drawer.css';
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+

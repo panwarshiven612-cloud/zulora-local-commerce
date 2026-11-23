@@ -14,7 +14,7 @@ import {
 import { uploadMultipleImages, uploadSingleImage } from './cloudinary.js';
 import { getCurrentGpsPosition } from './geo-pricing.js';
 import { PLATFORM_CONSTANTS } from './config.js';
-import { showToast, triggerBrowserNotification } from './notifications.js';
+import { showToast, triggerBrowserNotification, requestNotificationPermission } from './notifications.js';
 import { showUnauthorizedDomainDialog } from './auth.js';
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -24,6 +24,7 @@ let sellerProducts = [];
 let liveOrders = [];
 let unsubscribeOrders = null;
 let unsubscribeProducts = null;
+let unsubscribeSellerUid = null;
 let selectedFiles = []; // Array of files from multi-image input
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
@@ -79,7 +80,19 @@ function initAuth() {
     showAuthGate();
     return;
   }
+
+  // Safety timeout: if Firebase onAuthStateChanged doesn't fire within 6s, show auth gate
+  let authResolved = false;
+  const authTimeout = setTimeout(() => {
+    if (!authResolved) {
+      console.warn('[Seller] Auth state timeout — showing login gate');
+      showAuthGate();
+    }
+  }, 6000);
+
   onAuthStateChanged(auth, (user) => {
+    authResolved = true;
+    clearTimeout(authTimeout);
     if (user) {
       currentSeller = user;
       showDashboard(user);
@@ -89,6 +102,11 @@ function initAuth() {
       currentShop = null;
       showAuthGate();
     }
+  }, (err) => {
+    authResolved = true;
+    clearTimeout(authTimeout);
+    console.error('[Seller] onAuthStateChanged error:', err);
+    showAuthGate();
   });
 }
 
@@ -138,6 +156,7 @@ function showDashboard(user) {
   document.getElementById('btnSellerLogout')?.classList.remove('hidden');
   const nameEl = document.getElementById('sellerNameDisplay');
   if (nameEl) nameEl.textContent = user.displayName || user.email || 'Seller';
+  requestNotificationPermission().catch(() => {});
 }
 
 function showAuthGate() {
@@ -176,6 +195,7 @@ async function loadOrCreateShop(user) {
         whatsapp: '',
         category: 'Food',
         deliveryRadiusKm: 5,
+        perKmRate: 15,
         description: 'Quality local products delivered quickly.',
         lat: null,
         lng: null,
@@ -213,6 +233,9 @@ function populateShopForm(shop) {
   setVal('shopWhatsapp', shop.whatsapp || '');
   setVal('shopDescription', shop.description || '');
   setVal('shopDeliveryRadius', shop.deliveryRadiusKm || 5);
+  setVal('shopPerKmRate', shop.perKmRate || 15);
+  setVal('shopLat', shop.lat != null ? shop.lat : '');
+  setVal('shopLng', shop.lng != null ? shop.lng : '');
 
   if (shop.upiQrImageUrl) {
     const qrEl = document.getElementById('shopQrPreview');
@@ -281,23 +304,34 @@ async function handleToggleShopStatus(e) {
 async function handleCaptureShopGps() {
   const btn = document.getElementById('btnCaptureShopGps');
   const disp = document.getElementById('shopCoordsDisplay');
+  const latInput = document.getElementById('shopLat');
+  const lngInput = document.getElementById('shopLng');
+  const cityInput = document.getElementById('shopCity');
   if (btn) btn.textContent = '⏳ Capturing GPS…';
 
   try {
     const pos = await getCurrentGpsPosition();
+    if (latInput) latInput.value = pos.lat;
+    if (lngInput) lngInput.value = pos.lng;
+    if (cityInput && (!cityInput.value || cityInput.value === 'Local Market') && pos.town) {
+      cityInput.value = pos.town;
+    }
+    const locName = pos.town ? (pos.region ? `${pos.town}, ${pos.region}` : pos.town) : '';
     if (disp) {
-      disp.textContent = `📍 Lat: ${pos.lat.toFixed(5)}, Lng: ${pos.lng.toFixed(5)} (±${Math.round(pos.accuracy || 0)}m)`;
+      disp.textContent = `📍 ${locName ? locName + ' ' : ''}(${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)} ±${Math.round(pos.accuracy || 0)}m)`;
       disp.style.color = 'var(--emerald-600)';
     }
     if (currentShop) {
       currentShop.lat = pos.lat;
       currentShop.lng = pos.lng;
+      if (pos.town) currentShop.city = pos.town;
+      if (pos.region) currentShop.region = pos.region;
     }
-    showToast('Shop GPS coordinates captured! Save your profile to apply.', 'success');
+    showToast('Shop GPS & City captured! Click "Save Shop Profile" to apply.', 'success');
   } catch (err) {
     showToast(err.message || 'Could not capture GPS location.', 'error');
   } finally {
-    if (btn) btn.textContent = '🛰️ Capture Shop GPS';
+    if (btn) btn.textContent = '🛰️ Capture My GPS';
   }
 }
 
@@ -317,6 +351,7 @@ async function handleSaveShopProfile(e) {
   const category = document.getElementById('shopCategory')?.value;
   const description = document.getElementById('shopDescription')?.value.trim();
   const radius = parseFloat(document.getElementById('shopDeliveryRadius')?.value || '5');
+  const perKmRate = parseFloat(document.getElementById('shopPerKmRate')?.value || '15') || 15;
 
   if (!name) { showToast('Please enter a shop name.', 'warning'); return; }
   if (!rawHandle) { showToast('Please enter a unique shop handle.', 'warning'); return; }
@@ -343,6 +378,7 @@ async function handleSaveShopProfile(e) {
     category,
     description,
     deliveryRadiusKm: radius,
+    perKmRate: perKmRate,
     agreementsAccepted: true,
     agreementsTimestamp: serverTimestamp(),
     updatedAt: serverTimestamp()
@@ -362,8 +398,15 @@ async function handleSaveShopProfile(e) {
     payload.upiQrImageUrl = currentShop.upiQrImageUrl;
   }
 
-  if (currentShop.lat != null) payload.lat = currentShop.lat;
-  if (currentShop.lng != null) payload.lng = currentShop.lng;
+  const manualLat = parseFloat(document.getElementById('shopLat')?.value);
+  const manualLng = parseFloat(document.getElementById('shopLng')?.value);
+  if (!isNaN(manualLat) && !isNaN(manualLng)) {
+    payload.lat = manualLat;
+    payload.lng = manualLng;
+  } else {
+    if (currentShop.lat != null) payload.lat = currentShop.lat;
+    if (currentShop.lng != null) payload.lng = currentShop.lng;
+  }
 
   const btn = e.target.querySelector('button[type="submit"]');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Saving…'; }
@@ -634,68 +677,79 @@ window.deleteProductItem = async function(prodId) {
   }
 };
 
-// ─── Real Live Orders Listener (Single-field query: no missing index errors) ──
+// ─── Real Live Orders Listener (Dual parallel queries: shopId + sellerUid) ──
 let _prevOrderCount = -1; // track new order arrivals for browser notification
 
 function listenToSellerOrders(shopId, sellerUid) {
-  if (unsubscribeOrders) unsubscribeOrders();
+  if (unsubscribeOrders) { unsubscribeOrders(); unsubscribeOrders = null; }
+  if (unsubscribeSellerUid) { unsubscribeSellerUid(); unsubscribeSellerUid = null; }
   if (!db || isConfigPlaceholder) return;
 
-  // Query by shopId WITHOUT orderBy to prevent composite index requirement
-  const q = query(
-    collection(db, 'orders'),
-    where('shopId', '==', shopId)
-  );
+  const ordersMap = new Map();
 
-  unsubscribeOrders = onSnapshot(q, (snapshot) => {
-    const newOrdersMap = new Map();
+  // Always run BOTH queries simultaneously and merge results for full coverage:
+  // Query 1: by shopId (orders placed at the seller's shop document)
+  const qShop = query(collection(db, 'orders'), where('shopId', '==', shopId));
+  unsubscribeOrders = onSnapshot(qShop, (snapshot) => {
     snapshot.forEach(d => {
-      newOrdersMap.set(d.id, { id: d.id, docId: d.id, ...d.data() });
-    });
-
-    // Check if sellerUid query supplements additional orders
-    if (sellerUid && sellerUid !== shopId) {
-      listenSellerUidFallback(sellerUid, newOrdersMap);
-      return;
-    }
-
-    processSellerOrders(Array.from(newOrdersMap.values()));
-  }, (err) => {
-    console.error('[Seller] Orders onSnapshot notice:', err);
-    if (sellerUid) {
-      listenSellerUidFallback(sellerUid, new Map());
-    }
-  });
-}
-
-let unsubscribeSellerUid = null;
-function listenSellerUidFallback(sellerUid, ordersMap) {
-  if (!db || isConfigPlaceholder || !sellerUid) return;
-  if (unsubscribeSellerUid) unsubscribeSellerUid();
-
-  const qUid = query(
-    collection(db, 'orders'),
-    where('sellerUid', '==', sellerUid)
-  );
-
-  unsubscribeSellerUid = onSnapshot(qUid, snap => {
-    snap.forEach(d => {
       ordersMap.set(d.id, { id: d.id, docId: d.id, ...d.data() });
     });
+    // Handle deletions from this query's scope
+    snapshot.docChanges().forEach(change => {
+      if (change.type === 'removed') ordersMap.delete(change.doc.id);
+    });
     processSellerOrders(Array.from(ordersMap.values()));
-  }, err => {
-    console.warn('[Seller] SellerUid fallback notice:', err);
+  }, (err) => {
+    console.warn('[Seller] ShopId orders stream notice:', err);
     processSellerOrders(Array.from(ordersMap.values()));
   });
+
+  // Query 2: by sellerUid (unconditional parallel query so all orders matching sellerUid are captured)
+  if (sellerUid) {
+    const qUid = query(collection(db, 'orders'), where('sellerUid', '==', sellerUid));
+    unsubscribeSellerUid = onSnapshot(qUid, (snap) => {
+      snap.forEach(d => {
+        ordersMap.set(d.id, { id: d.id, docId: d.id, ...d.data() });
+      });
+      snap.docChanges().forEach(change => {
+        if (change.type === 'removed') ordersMap.delete(change.doc.id);
+      });
+      processSellerOrders(Array.from(ordersMap.values()));
+    }, (err) => {
+      console.warn('[Seller] SellerUid orders stream notice:', err);
+      processSellerOrders(Array.from(ordersMap.values()));
+    });
+  }
+}
+
+function playOrderNotificationChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12); // A5
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+  } catch (_) {}
 }
 
 function processSellerOrders(newOrders) {
   // Sort in memory by createdAt descending
   newOrders.sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a));
 
-  // Trigger browser notification when a NEW order arrives (count increased)
+  // Trigger browser notification and sound chime when a NEW order arrives (count increased)
   if (_prevOrderCount >= 0 && newOrders.length > _prevOrderCount) {
     const newest = newOrders[0];
+    playOrderNotificationChime();
+    showToast(`🛒 New Order #${newest.orderCode || newest.orderId || newest.id} from ${newest.buyerName || 'a customer'}!`, 'success');
     triggerBrowserNotification(
       '🛒 New Order on Zulora Local!',
       `Order #${newest.orderCode || newest.orderId || newest.id} from ${newest.buyerName || 'a customer'} — ₹${newest.totalAmount || newest.grandTotal || 0}`,

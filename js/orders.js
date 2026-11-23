@@ -54,7 +54,18 @@ function initAuth() {
     `;
   }
 
+  let authResolved = false;
+  const authTimeout = setTimeout(() => {
+    if (!authResolved) {
+      console.warn('[Orders] Auth state timeout — showing login prompt');
+      authPrompt?.classList.remove('hidden');
+      renderOrders();
+    }
+  }, 6000);
+
   onAuthStateChanged(auth, user => {
+    authResolved = true;
+    clearTimeout(authTimeout);
     if (user) {
       currentUser = user;
       authPrompt?.classList.add('hidden');
@@ -67,6 +78,12 @@ function initAuth() {
       authPrompt?.classList.remove('hidden');
       renderOrders();
     }
+  }, (err) => {
+    authResolved = true;
+    clearTimeout(authTimeout);
+    console.error('[Orders] onAuthStateChanged error:', err);
+    authPrompt?.classList.remove('hidden');
+    renderOrders();
   });
 }
 
@@ -87,62 +104,52 @@ async function handleBuyerLogin() {
   }
 }
 
-// ─── Live Orders Stream (Single-Field Query: No Missing Index Errors) ─────────
+// ─── Live Orders Stream (Dual parallel queries: buyerUid + buyerEmail) ─────────
 function listenToLiveOrders(buyerUid, buyerEmail = '') {
   if (!db || isConfigPlaceholder || !buyerUid) return;
   if (unsubscribe) { unsubscribe(); unsubscribe = null; }
   if (unsubscribeFallback) { unsubscribeFallback(); unsubscribeFallback = null; }
 
-  // Query strictly on buyerUid WITHOUT orderBy to eliminate compound index requirements
+  const ordersMap = new Map();
+
+  // Query 1: strictly on buyerUid WITHOUT orderBy to eliminate compound index requirements
   const q = query(
     collection(db, 'orders'),
     where('buyerUid', '==', buyerUid)
   );
 
   unsubscribe = onSnapshot(q, snapshot => {
-    const ordersMap = new Map();
-
     snapshot.forEach(d => {
       ordersMap.set(d.id, { docId: d.id, ...d.data() });
     });
-
-    // Check if we need to supplement with fallback on buyerEmail
-    if (ordersMap.size === 0 && buyerEmail) {
-      listenEmailFallback(buyerEmail, ordersMap);
-      return;
-    }
-
+    snapshot.docChanges().forEach(change => {
+      if (change.type === 'removed') ordersMap.delete(change.doc.id);
+    });
     processAndRenderOrders(Array.from(ordersMap.values()));
   }, err => {
-    console.warn('[Orders] onSnapshot notice:', err);
-    // If error, try fallback by email
-    if (buyerEmail) {
-      listenEmailFallback(buyerEmail, new Map());
-    } else {
-      userOrders = [];
-      renderOrders();
-    }
+    console.warn('[Orders] BuyerUid onSnapshot notice:', err);
+    processAndRenderOrders(Array.from(ordersMap.values()));
   });
-}
 
-function listenEmailFallback(buyerEmail, existingMap) {
-  if (!db || isConfigPlaceholder || !buyerEmail) return;
-  if (unsubscribeFallback) { unsubscribeFallback(); unsubscribeFallback = null; }
-
-  const qEmail = query(
-    collection(db, 'orders'),
-    where('buyerEmail', '==', buyerEmail)
-  );
-
-  unsubscribeFallback = onSnapshot(qEmail, snap => {
-    snap.forEach(d => {
-      existingMap.set(d.id, { docId: d.id, ...d.data() });
+  // Query 2: parallel stream on buyerEmail (for guest orders or multi-session continuity)
+  if (buyerEmail) {
+    const qEmail = query(
+      collection(db, 'orders'),
+      where('buyerEmail', '==', buyerEmail)
+    );
+    unsubscribeFallback = onSnapshot(qEmail, snap => {
+      snap.forEach(d => {
+        ordersMap.set(d.id, { docId: d.id, ...d.data() });
+      });
+      snap.docChanges().forEach(change => {
+        if (change.type === 'removed') ordersMap.delete(change.doc.id);
+      });
+      processAndRenderOrders(Array.from(ordersMap.values()));
+    }, err => {
+      console.warn('[Orders] Email fallback notice:', err);
+      processAndRenderOrders(Array.from(ordersMap.values()));
     });
-    processAndRenderOrders(Array.from(existingMap.values()));
-  }, err => {
-    console.warn('[Orders] Email fallback notice:', err);
-    processAndRenderOrders(Array.from(existingMap.values()));
-  });
+  }
 }
 
 function processAndRenderOrders(ordersList) {
