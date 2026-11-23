@@ -15,6 +15,7 @@ import { uploadMultipleImages, uploadSingleImage } from './cloudinary.js';
 import { getCurrentGpsPosition } from './geo-pricing.js';
 import { PLATFORM_CONSTANTS } from './config.js';
 import { showToast, triggerBrowserNotification } from './notifications.js';
+import { showUnauthorizedDomainDialog } from './auth.js';
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentSeller = null;
@@ -101,7 +102,9 @@ async function handleSellerLogin() {
     currentSeller = result.user;
     showToast('Signed in to Seller Mode!', 'success');
   } catch (err) {
-    if (err.code !== 'auth/popup-closed-by-user') {
+    if (err.code === 'auth/unauthorized-domain') {
+      showUnauthorizedDomainDialog();
+    } else if (err.code !== 'auth/popup-closed-by-user') {
       showToast('Sign-in failed: ' + (err.message || 'Unknown error'), 'error');
     }
   }
@@ -626,42 +629,89 @@ window.deleteProductItem = async function(prodId) {
   }
 };
 
-// ─── Real Live Orders Listener ────────────────────────────────────────────────
+// ─── Real Live Orders Listener (Single-field query: no missing index errors) ──
 let _prevOrderCount = -1; // track new order arrivals for browser notification
 
 function listenToSellerOrders(shopId, sellerUid) {
   if (unsubscribeOrders) unsubscribeOrders();
   if (!db || isConfigPlaceholder) return;
 
+  // Query by shopId WITHOUT orderBy to prevent composite index requirement
   const q = query(
     collection(db, 'orders'),
-    where('shopId', '==', shopId),
-    orderBy('createdAt', 'desc')
+    where('shopId', '==', shopId)
   );
 
   unsubscribeOrders = onSnapshot(q, (snapshot) => {
-    const newOrders = [];
+    const newOrdersMap = new Map();
     snapshot.forEach(d => {
-      newOrders.push({ id: d.id, ...d.data() });
+      newOrdersMap.set(d.id, { id: d.id, docId: d.id, ...d.data() });
     });
 
-    // Trigger browser notification when a NEW order arrives (count increased)
-    if (_prevOrderCount >= 0 && newOrders.length > _prevOrderCount) {
-      const newest = newOrders[0];
-      triggerBrowserNotification(
-        '🛒 New Order on Zulora Local!',
-        `Order #${newest.orderId || newest.id} from ${newest.buyerName || 'a customer'} — ₹${newest.totalAmount || newest.grandTotal || 0}`,
-        './seller.html'
-      );
+    // Check if sellerUid query supplements additional orders
+    if (sellerUid && sellerUid !== shopId) {
+      listenSellerUidFallback(sellerUid, newOrdersMap);
+      return;
     }
-    _prevOrderCount = newOrders.length;
 
-    liveOrders = newOrders;
-    renderSellerOrders();
-    updateDashboardStats();
+    processSellerOrders(Array.from(newOrdersMap.values()));
   }, (err) => {
-    console.error('[Seller] Orders onSnapshot error:', err);
+    console.error('[Seller] Orders onSnapshot notice:', err);
+    if (sellerUid) {
+      listenSellerUidFallback(sellerUid, new Map());
+    }
   });
+}
+
+let unsubscribeSellerUid = null;
+function listenSellerUidFallback(sellerUid, ordersMap) {
+  if (!db || isConfigPlaceholder || !sellerUid) return;
+  if (unsubscribeSellerUid) unsubscribeSellerUid();
+
+  const qUid = query(
+    collection(db, 'orders'),
+    where('sellerUid', '==', sellerUid)
+  );
+
+  unsubscribeSellerUid = onSnapshot(qUid, snap => {
+    snap.forEach(d => {
+      ordersMap.set(d.id, { id: d.id, docId: d.id, ...d.data() });
+    });
+    processSellerOrders(Array.from(ordersMap.values()));
+  }, err => {
+    console.warn('[Seller] SellerUid fallback notice:', err);
+    processSellerOrders(Array.from(ordersMap.values()));
+  });
+}
+
+function processSellerOrders(newOrders) {
+  // Sort in memory by createdAt descending
+  newOrders.sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a));
+
+  // Trigger browser notification when a NEW order arrives (count increased)
+  if (_prevOrderCount >= 0 && newOrders.length > _prevOrderCount) {
+    const newest = newOrders[0];
+    triggerBrowserNotification(
+      '🛒 New Order on Zulora Local!',
+      `Order #${newest.orderCode || newest.orderId || newest.id} from ${newest.buyerName || 'a customer'} — ₹${newest.totalAmount || newest.grandTotal || 0}`,
+      './seller.html'
+    );
+  }
+  _prevOrderCount = newOrders.length;
+
+  liveOrders = newOrders;
+  renderSellerOrders();
+  updateDashboardStats();
+}
+
+function getOrderTimestamp(order) {
+  if (!order) return 0;
+  if (order.createdAt?.toMillis) return order.createdAt.toMillis();
+  if (order.createdAt?.seconds) return order.createdAt.seconds * 1000;
+  if (order.createdAtIso) return new Date(order.createdAtIso).getTime();
+  if (typeof order.createdAt === 'number') return order.createdAt;
+  if (typeof order.createdAt === 'string') return new Date(order.createdAt).getTime();
+  return 0;
 }
 
 function renderSellerOrders() {
@@ -680,41 +730,80 @@ function renderSellerOrders() {
   }
 
   container.innerHTML = liveOrders.map(order => {
-    const status = order.orderStatus || 'Placed';
+    const rawStatus = order.orderStatus || order.status || 'Placed';
+    const status = normalizeStatus(rawStatus);
     const cleanPhone = (order.buyerPhone || '').replace(/[^0-9]/g, '');
     const callUrl = `tel:+91${cleanPhone}`;
-    const waUrl = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(`Hi ${order.buyerName}, your Zulora order #${order.orderId || order.id} is confirmed!`)}`;
+    const waUrl = `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(`Hi ${order.buyerName}, your Zulora order #${order.orderCode || order.orderId || order.id} is confirmed!`)}`;
+    const dist = (order.distanceKm != null || order.distKm != null) ? `${order.distanceKm ?? order.distKm} km` : 'Local';
 
     return `
-      <div class="glass-card" style="padding:1.25rem;margin-bottom:1rem;border-left:4px solid var(--azure-600);">
+      <div class="glass-card" style="padding:1.25rem;margin-bottom:1rem;border-left:4px solid var(--azure-600);box-shadow:var(--shadow-sm);">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
           <div>
-            <div style="font-size:1.1rem;font-weight:800;color:var(--slate-900);">Order #${escapeHtml(order.orderId || order.id)}</div>
-            <div style="font-size:0.8rem;color:var(--slate-500);">Buyer: <strong>${escapeHtml(order.buyerName)}</strong> (${escapeHtml(order.buyerPhone)})</div>
-            <div style="font-size:0.8rem;color:var(--slate-500);">📍 ${escapeHtml(order.buyerAddress)}</div>
+            <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+              <span style="font-size:1.1rem;font-weight:800;color:var(--slate-900);">Order #${escapeHtml(order.orderCode || order.orderId || order.id)}</span>
+              <span class="badge" style="background:${getStatusBadgeColor(status)};color:#fff;font-size:0.75rem;">${escapeHtml(status)}</span>
+            </div>
+            <div style="font-size:0.82rem;color:var(--slate-700);margin-top:0.25rem;">
+              Buyer: <strong>${escapeHtml(order.buyerName)}</strong> (<a href="${callUrl}" style="color:var(--azure-700);font-weight:700;">+91 ${escapeHtml(order.buyerPhone)}</a>)
+            </div>
+            <div style="font-size:0.8rem;color:var(--slate-600);margin-top:0.2rem;">
+              📍 Address: ${escapeHtml(order.buyerAddress || 'Address on file')}${order.buyerCityTown ? `, ${escapeHtml(order.buyerCityTown)}` : ''}${order.buyerState ? `, ${escapeHtml(order.buyerState)}` : ''}
+            </div>
+            <div style="font-size:0.78rem;color:var(--azure-800);margin-top:0.2rem;font-weight:600;">
+              📍 Distance: ${dist} • Mode: ${escapeHtml(order.paymentMethod || order.paymentMode || 'COD')}
+            </div>
           </div>
           <div style="text-align:right;">
-            <div style="font-size:1.25rem;font-weight:800;color:var(--emerald-600);">₹${order.totalAmount || order.grandTotal || 0}</div>
-            <span class="badge" style="background:var(--azure-100);color:var(--azure-800);font-size:0.75rem;">${escapeHtml(status)}</span>
+            <div style="font-size:1.3rem;font-weight:900;color:var(--emerald-600);">₹${order.totalAmount || order.grandTotal || 0}</div>
+            <div style="font-size:0.72rem;color:var(--slate-400);">${formatOrderDate(order.createdAt || order.createdAtIso)}</div>
           </div>
         </div>
 
         <!-- Ordered Items list -->
-        <div style="background:var(--slate-50);padding:0.6rem 0.85rem;border-radius:var(--radius-md);margin-bottom:0.75rem;font-size:0.82rem;">
-          ${(order.items || []).map(i => `<div>• ${escapeHtml(i.title)} × ${i.qty || i.quantity} (₹${(i.price || 0) * (i.qty || i.quantity)})</div>`).join('')}
+        <div style="background:var(--slate-50);border:1px solid var(--border-subtle);padding:0.65rem 0.85rem;border-radius:var(--radius-md);margin-bottom:0.75rem;font-size:0.82rem;">
+          <div style="font-weight:700;color:var(--slate-700);margin-bottom:0.35rem;">Ordered Items:</div>
+          ${(order.items || []).map(i => `<div style="display:flex;justify-content:space-between;padding:0.2rem 0;border-bottom:1px dashed var(--slate-200);">
+            <span>• ${escapeHtml(i.title)} ${i.unit ? `(${escapeHtml(i.unit)})` : ''} × ${i.qty || i.quantity}</span>
+            <span style="font-weight:700;">₹${(i.price || 0) * (i.qty || i.quantity)}</span>
+          </div>`).join('')}
+          <div style="display:flex;justify-content:space-between;padding-top:0.35rem;font-size:0.82rem;font-weight:700;">
+            <span>Subtotal: ₹${order.subtotal || order.itemsSubtotal || 0} + Delivery: ₹${order.deliveryCharge || order.baseDeliveryFee || 15}</span>
+            <span style="color:var(--azure-800);">Total: ₹${order.totalAmount || order.grandTotal || 0}</span>
+          </div>
         </div>
 
-        <!-- 4-step status updater -->
-        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;margin-bottom:0.75rem;">
-          <span style="font-size:0.78rem;font-weight:700;color:var(--slate-600);">Update Status:</span>
-          ${['Placed', 'Accepted & Packing', 'Out for Delivery', 'Delivered'].map(s => `
-            <button class="btn btn-sm ${status === s ? 'btn-primary' : 'btn-ghost'}" onclick="window.updateOrderStatus('${escapeHtml(order.id)}', '${s}')" style="font-size:0.72rem;padding:0.25rem 0.5rem;">
-              ${s}
-            </button>
-          `).join('')}
+        <!-- 4 Action Buttons: Confirm, Out for Delivery, Delivered, Cancel -->
+        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;margin-bottom:0.75rem;background:#f8fafc;padding:0.5rem;border-radius:var(--radius-md);">
+          <span style="font-size:0.78rem;font-weight:800;color:var(--slate-700);margin-right:0.25rem;">Live Action:</span>
+          
+          <button class="btn btn-sm ${status === 'Confirmed by Merchant' ? 'btn-primary' : 'btn-ghost'}" 
+            onclick="window.updateOrderStatus('${escapeHtml(order.id)}', 'Confirmed by Merchant')" 
+            style="font-size:0.75rem;padding:0.3rem 0.65rem;font-weight:700;">
+            ✅ Confirm Order
+          </button>
+
+          <button class="btn btn-sm ${status === 'Packed / Out for Delivery' ? 'btn-primary' : 'btn-ghost'}" 
+            onclick="window.updateOrderStatus('${escapeHtml(order.id)}', 'Packed / Out for Delivery')" 
+            style="font-size:0.75rem;padding:0.3rem 0.65rem;font-weight:700;">
+            🛵 Out for Delivery
+          </button>
+
+          <button class="btn btn-sm ${status === 'Delivered' || status === 'Verified Delivered' ? 'btn-primary' : 'btn-ghost'}" 
+            onclick="window.updateOrderStatus('${escapeHtml(order.id)}', 'Delivered')" 
+            style="font-size:0.75rem;padding:0.3rem 0.65rem;font-weight:700;background:${status === 'Delivered' || status === 'Verified Delivered' ? 'var(--emerald-600)' : ''};border-color:var(--emerald-600);">
+            🎉 Mark Delivered
+          </button>
+
+          <button class="btn btn-sm btn-ghost" 
+            onclick="window.sellerCancelOrder('${escapeHtml(order.id)}')" 
+            style="font-size:0.75rem;padding:0.3rem 0.65rem;color:var(--rose-600);border-color:var(--rose-200);">
+            ✕ Cancel Order
+          </button>
         </div>
 
-        <!-- Action buttons -->
+        <!-- Customer Communication links -->
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
           <a href="${callUrl}" class="btn btn-secondary btn-sm" style="display:inline-flex;align-items:center;gap:0.3rem;">
             📞 Call Buyer
@@ -733,13 +822,56 @@ window.updateOrderStatus = async function(orderDocId, newStatus) {
   try {
     await updateDoc(doc(db, 'orders', orderDocId), {
       orderStatus: newStatus,
-      statusUpdatedAt: serverTimestamp()
+      status: newStatus.toLowerCase(),
+      statusUpdatedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
     });
     showToast(`Order status updated to: ${newStatus}`, 'success');
   } catch (err) {
     showToast('Failed to update status: ' + err.message, 'error');
   }
 };
+
+window.sellerCancelOrder = async function(orderDocId) {
+  if (!confirm('Are you sure you want to cancel this order? This will update the customer status immediately.')) return;
+  if (!db || isConfigPlaceholder) return;
+  try {
+    await updateDoc(doc(db, 'orders', orderDocId), {
+      orderStatus: 'Cancelled',
+      status: 'cancelled',
+      cancelledAt: serverTimestamp(),
+      statusUpdatedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    showToast('Order cancelled.', 'info');
+  } catch (err) {
+    showToast('Failed to cancel order: ' + err.message, 'error');
+  }
+};
+
+function normalizeStatus(st) {
+  if (!st) return 'Placed';
+  const lower = st.toLowerCase().trim();
+  if (lower === 'placed') return 'Placed';
+  if (lower.includes('confirm') || lower.includes('approved') || lower.includes('accepted')) return 'Confirmed by Merchant';
+  if (lower.includes('pack') || lower.includes('out for delivery')) return 'Packed / Out for Delivery';
+  if (lower.includes('verified')) return 'Verified Delivered';
+  if (lower.includes('deliver')) return 'Delivered';
+  if (lower.includes('cancel')) return 'Cancelled';
+  return st;
+}
+
+function getStatusBadgeColor(status) {
+  switch(status) {
+    case 'Placed': return 'var(--azure-600)';
+    case 'Confirmed by Merchant': return 'var(--emerald-600)';
+    case 'Packed / Out for Delivery': return '#d97706';
+    case 'Delivered':
+    case 'Verified Delivered': return 'var(--emerald-700)';
+    case 'Cancelled': return 'var(--rose-600)';
+    default: return 'var(--slate-600)';
+  }
+}
 
 // ─── Dashboard Stats & Commission ─────────────────────────────────────────────
 function updateDashboardStats() {

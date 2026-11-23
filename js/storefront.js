@@ -124,7 +124,7 @@ export function renderStorefrontProducts({
  * Build Single Blinkit-Grade Product Card HTML
  */
 export function buildProductCardHtml(product, shop = {}, userLocation = null, cartQty = 0) {
-  const isVerified = Boolean(shop.isVerified || product.isVerified);
+  const isVerified = Boolean(shop.isVerified);
   const isOpen = shop.isOpen !== false;
   const outOfStock = product.stock != null && product.stock <= 0;
   const lowStock = product.stock > 0 && product.stock <= 5;

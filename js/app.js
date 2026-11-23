@@ -6,7 +6,7 @@
 
 import {
   db, collection, doc, getDoc, getDocs, addDoc, updateDoc,
-  query, orderBy, serverTimestamp, increment, isConfigPlaceholder
+  query, orderBy, onSnapshot, serverTimestamp, increment, isConfigPlaceholder
 } from './firebase-init.js';
 
 import {
@@ -413,42 +413,70 @@ function updateAuthUI(user) {
   }
 }
 
-// ─── Real Firestore Products Load ─────────────────────────────────────────────
-async function loadPlatformData() {
+// ─── Real Firestore Products Load (Live onSnapshot Sync) ─────────────────────
+let unsubShops = null;
+let unsubProducts = null;
+
+function loadPlatformData() {
   const grid = document.getElementById('productGrid');
   showLoadingSkeleton(grid, 4);
 
-  if (db && !isConfigPlaceholder) {
-    try {
-      // 1. Fetch real shops
-      const shopsSnap = await getDocs(collection(db, 'shops'));
-      allShops.clear();
-      shopsSnap.forEach(d => {
-        allShops.set(d.id, { id: d.id, ...d.data() });
-      });
-
-      // 2. Fetch real products
-      const productsQuery = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
-      const productsSnap = await getDocs(productsQuery);
-      allProducts = [];
-
-      productsSnap.forEach(d => {
-        const p = { id: d.id, ...d.data() };
-        if (p.title && (p.price != null)) {
-          allProducts.push(p);
-        }
-      });
-    } catch (err) {
-      console.error('[Firestore] Real products fetch error:', err);
-      allProducts = [];
-    }
-  } else {
+  if (!db || isConfigPlaceholder) {
     allProducts = [];
+    allShops.clear();
+    loadCartFromStorage(allProducts);
+    updateCartUI();
+    refreshProductGrid();
+    return;
   }
 
-  loadCartFromStorage(allProducts);
-  updateCartUI();
-  refreshProductGrid();
+  // 1. Real-time shops listener (syncs shop updates and verification blue ticks live!)
+  if (unsubShops) unsubShops();
+  try {
+    unsubShops = onSnapshot(collection(db, 'shops'), snapshot => {
+      allShops.clear();
+      snapshot.forEach(d => {
+        allShops.set(d.id, { id: d.id, ...d.data() });
+      });
+      refreshProductGrid();
+    }, err => {
+      console.warn('[Firestore] Shops live listener notice:', err);
+    });
+  } catch (err) {
+    console.warn('[Firestore] Shops listener setup:', err);
+  }
+
+  // 2. Real-time products listener (syncs additions, edits, and deletions live!)
+  if (unsubProducts) unsubProducts();
+  try {
+    unsubProducts = onSnapshot(collection(db, 'products'), snapshot => {
+      const rawProds = [];
+      snapshot.forEach(d => {
+        const p = { id: d.id, ...d.data() };
+        if (p.title && (p.price != null)) {
+          rawProds.push(p);
+        }
+      });
+
+      // Sort client-side by createdAt descending (no composite index required)
+      rawProds.sort((a, b) => {
+        const tA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAtIso ? new Date(a.createdAtIso).getTime() : 0);
+        const tB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAtIso ? new Date(b.createdAtIso).getTime() : 0);
+        return tB - tA;
+      });
+
+      allProducts = rawProds;
+
+      // Cleanse cart: immediately purge any deleted products from user's active cart
+      loadCartFromStorage(allProducts);
+      updateCartUI();
+      refreshProductGrid();
+    }, err => {
+      console.warn('[Firestore] Products live listener notice:', err);
+    });
+  } catch (err) {
+    console.warn('[Firestore] Products listener setup:', err);
+  }
 }
 
 function refreshProductGrid() {
@@ -801,8 +829,10 @@ window.executeOrderPlacement = async function() {
     const shop = group.shop;
     const shopTotal = group.grandTotal;
 
+    const generatedOrderCode = 'ZUL-' + Math.floor(100000 + Math.random() * 900000);
     const orderData = {
-      orderId: 'ZUL-' + Math.floor(100000 + Math.random() * 900000),
+      orderCode: generatedOrderCode,
+      orderId: generatedOrderCode,
       buyerName: name,
       buyerPhone: phone,
       buyerAddress: address,
@@ -810,11 +840,18 @@ window.executeOrderPlacement = async function() {
       buyerEmail: currentUser?.email || '',
       buyerCityTown: userLocation?.town || '',
       buyerState: userLocation?.region || '',
-      sellerUid: group.shop.sellerUid || group.shop.ownerUid || group.shop.ownerId || '',
+      buyerCoords: (userLocation?.lat != null && userLocation?.lng != null)
+        ? { lat: userLocation.lat, lng: userLocation.lng }
+        : null,
+      sellerUid: group.shop.sellerUid || group.shop.ownerUid || group.shop.ownerId || shopId,
       shopId,
-      shopName: shop.name || 'Local Seller',
-      sellerPhone: shop.phone || '',
-      sellerEmail: shop.email || '',
+      shopName: group.shop.name || 'Local Seller',
+      shopPhone: group.shop.phone || '',
+      shopEmail: group.shop.ownerEmail || group.shop.email || '',
+      shopUpiId: group.shop.upiId || '',
+      shopQrUrl: group.shop.upiQrImageUrl || '',
+      sellerPhone: group.shop.phone || '',
+      sellerEmail: group.shop.ownerEmail || group.shop.email || '',
       items: group.items.map(i => ({
         productId: i.product.id,
         title: i.product.title,
@@ -824,20 +861,27 @@ window.executeOrderPlacement = async function() {
         unit: i.product.unit || '',
         weightKg: i.product.weightKg || i.product.weight || 0.5
       })),
+      subtotal: group.shopTotal,
       itemsSubtotal: group.shopTotal,
-      baseDeliveryFee: group.baseFee,
-      weightFee: group.weightFee,
+      distanceKm: group.distKm != null ? group.distKm : null,
+      distKm: group.distKm != null ? group.distKm : null,
+      deliveryCharge: group.baseFee || group.deliveryFee || 15,
+      baseDeliveryFee: group.baseFee || group.deliveryFee || 15,
+      extraWeightCharge: group.weightFee || 0,
+      weightFee: group.weightFee || 0,
       totalWeightKg: group.totalWeightKg,
-      distKm: group.distKm,
-      deliveryFee: group.deliveryFee,
-      grandTotal: shopTotal,
       totalAmount: shopTotal,
+      grandTotal: shopTotal,
+      paymentMethod: payment,
       paymentMode: payment,
+      status: 'placed',
       orderStatus: 'Placed',
       buyerDeliveredConfirmed: false,
       deliveryModel: 'Self-Delivery (Merchant)',
       cancelableUntil: Date.now() + 5 * 60 * 1000,
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      createdAtIso: new Date().toISOString(),
+      updatedAt: serverTimestamp()
     };
 
     let docId = 'ORD-' + Date.now();

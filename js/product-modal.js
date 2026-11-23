@@ -19,7 +19,7 @@ export function openProductDetailModal({
 
   document.getElementById('productDetailModal')?.remove();
 
-  const isVerified = Boolean(shop.isVerified || product.isVerified);
+  const isVerified = Boolean(shop.isVerified);
   const rawImages = Array.isArray(product.images) && product.images.length > 0
     ? product.images
     : (product.imageUrl ? [product.imageUrl] : ['https://via.placeholder.com/400x400?text=Product+Image']);

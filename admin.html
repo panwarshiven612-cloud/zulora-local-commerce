@@ -33,7 +33,7 @@
   </header>
 
   <!-- ═══════════════ MAIN ═══════════════ -->
-  <main class="main-content" style="max-width:1200px;padding-top:1.5rem;">
+  <main class="main-content" style="max-width:1240px;padding-top:1.5rem;">
 
     <!-- Auth Gate -->
     <div id="adminAuthGate" class="glass-card" style="text-align:center;padding:3.5rem 1.5rem;max-width:520px;margin:3rem auto;border:1.5px solid var(--rose-300);">
@@ -57,7 +57,7 @@
           <span style="font-size:.72rem;text-transform:uppercase;color:var(--rose-600);font-weight:800;">Logged in as Supreme Admin</span>
           <h2 style="font-size:1.2rem;" id="adminEmailDisplay">zulora.help@gmail.com</h2>
         </div>
-        <input type="text" class="form-input" id="adminSearchInput" placeholder="🔍 Filter by shop, handle, or order ID…" style="width:280px;" />
+        <input type="text" class="form-input" id="adminSearchInput" placeholder="🔍 Search shops, products, users, or orders…" style="width:300px;" />
       </div>
 
       <!-- KPI Grid -->
@@ -65,6 +65,7 @@
         <div class="stat-card"><div class="stat-val" id="kpiTotalShops">0</div><div class="stat-label">Registered Shops</div></div>
         <div class="stat-card"><div class="stat-val" id="kpiTotalProducts">0</div><div class="stat-label">Platform Products</div></div>
         <div class="stat-card"><div class="stat-val" id="kpiTotalOrders">0</div><div class="stat-label">Cross-Town Orders</div></div>
+        <div class="stat-card"><div class="stat-val" id="kpiTotalUsers">0</div><div class="stat-label">Registered Users</div></div>
         <div class="stat-card"><div class="stat-val" id="kpiTotalGmv">₹0</div><div class="stat-label">Platform GMV</div></div>
         <div class="stat-card" style="border-left:4px solid var(--rose-600);">
           <div class="stat-val" style="color:var(--rose-600);" id="kpiTotalCommission">₹0 (3%)</div>
@@ -72,20 +73,20 @@
         </div>
       </div>
 
-      <!-- Verified Badge Management -->
+      <!-- Verified Badge Management (Shops Only) -->
       <section class="glass-card" style="padding:1.5rem;margin-bottom:2rem;">
         <div class="section-header" style="margin-bottom:1rem;">
-          <div class="section-title"><span>✓</span> Manage Seller Verification &amp; Blue Tick</div>
-          <span style="font-size:.75rem;color:var(--azure-600);font-weight:700;">Grant or revoke verified status</span>
+          <div class="section-title"><span>✓</span> Founder Shop-Level Blue Tick Management</div>
+          <span style="font-size:.75rem;color:var(--azure-600);font-weight:700;">Blue tick granted exclusively on shop/seller profile</span>
         </div>
         <div style="overflow-x:auto;">
           <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
             <thead>
               <tr style="border-bottom:2px solid var(--slate-200);color:var(--slate-600);">
                 <th style="padding:.7rem .5rem;text-align:left;">Shop &amp; Handle</th>
-                <th style="padding:.7rem .5rem;text-align:left;">Contact</th>
-                <th style="padding:.7rem .5rem;text-align:left;">Current Status</th>
-                <th style="padding:.7rem .5rem;text-align:left;">Action</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Owner &amp; Contact</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Blue Tick Status</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Founder Action</th>
               </tr>
             </thead>
             <tbody id="verifiedTableBody"></tbody>
@@ -93,29 +94,46 @@
         </div>
       </section>
 
-      <!-- Top Selling Products -->
+      <!-- All Platform Products & Delete Product Control -->
       <section class="glass-card" style="padding:1.5rem;margin-bottom:2rem;">
-        <div class="section-title" style="margin-bottom:1rem;"><span>🔥</span> Top-Selling Platform Products</div>
-        <div id="topProductsContainer"></div>
+        <div class="section-header" style="margin-bottom:1rem;">
+          <div class="section-title"><span>📦</span> All Platform Products &amp; Direct Deletion</div>
+          <span style="font-size:.75rem;color:var(--rose-600);font-weight:700;">Deletions sync live to storefront in real-time</span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+            <thead>
+              <tr style="border-bottom:2px solid var(--slate-200);color:var(--slate-600);">
+                <th style="padding:.7rem .5rem;text-align:left;">Product</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Category</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Shop</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Price &amp; Stock</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Sold</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Admin Action</th>
+              </tr>
+            </thead>
+            <tbody id="productsTableBody"></tbody>
+          </table>
+        </div>
       </section>
 
-      <!-- Shops Commission Ledger -->
+      <!-- Shops Commission Ledger & Shop Suspension -->
       <section class="glass-card" style="padding:1.5rem;margin-bottom:2rem;">
         <div class="section-header">
-          <div class="section-title"><span>🏪</span> Registered Shops &amp; Commission Ledger</div>
-          <span style="font-size:.75rem;color:var(--rose-600);font-weight:700;">2%–5% Platform Fee Collection</span>
+          <div class="section-title"><span>🏪</span> Registered Shops, Commission Ledger &amp; Controls</div>
+          <span style="font-size:.75rem;color:var(--rose-600);font-weight:700;">3% Platform Commission Ledger</span>
         </div>
         <div style="overflow-x:auto;margin-top:1rem;">
           <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
             <thead>
               <tr style="border-bottom:2px solid var(--slate-200);color:var(--slate-600);">
                 <th style="padding:.7rem .5rem;text-align:left;">Shop &amp; Handle</th>
-                <th style="padding:.7rem .5rem;text-align:left;">Contact</th>
-                <th style="padding:.7rem .5rem;text-align:left;">Status</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Owner Details</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Store Status</th>
                 <th style="padding:.7rem .5rem;text-align:left;">Verified</th>
                 <th style="padding:.7rem .5rem;text-align:left;">GMV</th>
                 <th style="padding:.7rem .5rem;text-align:left;">3% Commission</th>
-                <th style="padding:.7rem .5rem;text-align:left;">Collect Commission</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Admin Controls</th>
               </tr>
             </thead>
             <tbody id="shopsTableBody"></tbody>
@@ -123,25 +141,47 @@
         </div>
       </section>
 
-      <!-- All Platform Orders -->
-      <section class="glass-card" style="padding:1.5rem;margin-bottom:3rem;">
+      <!-- All Platform Orders Across All Towns -->
+      <section class="glass-card" style="padding:1.5rem;margin-bottom:2rem;">
         <div class="section-header">
-          <div class="section-title"><span>📦</span> All Orders Across All Towns</div>
-          <span style="font-size:.75rem;color:var(--slate-500);">Live transaction history</span>
+          <div class="section-title"><span>🛍️</span> All Platform Orders (Placed, Confirmed &amp; Delivered)</div>
+          <span style="font-size:.75rem;color:var(--slate-500);">Complete real-time transaction ledger</span>
         </div>
         <div style="overflow-x:auto;margin-top:1rem;">
           <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
             <thead>
               <tr style="border-bottom:2px solid var(--slate-200);color:var(--slate-600);">
                 <th style="padding:.7rem .5rem;text-align:left;">Order ID</th>
-                <th style="padding:.7rem .5rem;text-align:left;">Merchant</th>
-                <th style="padding:.7rem .5rem;text-align:left;">Customer</th>
-                <th style="padding:.7rem .5rem;text-align:left;">Amount</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Merchant Info</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Customer Info</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Items &amp; Amount</th>
                 <th style="padding:.7rem .5rem;text-align:left;">Status</th>
                 <th style="padding:.7rem .5rem;text-align:left;">Date</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Action</th>
               </tr>
             </thead>
             <tbody id="ordersTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Registered Platform Users -->
+      <section class="glass-card" style="padding:1.5rem;margin-bottom:3rem;">
+        <div class="section-header">
+          <div class="section-title"><span>👥</span> Registered Platform Users</div>
+          <span style="font-size:.75rem;color:var(--slate-500);">All authenticated buyers &amp; merchants</span>
+        </div>
+        <div style="overflow-x:auto;margin-top:1rem;">
+          <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+            <thead>
+              <tr style="border-bottom:2px solid var(--slate-200);color:var(--slate-600);">
+                <th style="padding:.7rem .5rem;text-align:left;">User</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Email</th>
+                <th style="padding:.7rem .5rem;text-align:left;">User UID</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Saved Location</th>
+              </tr>
+            </thead>
+            <tbody id="usersTableBody"></tbody>
           </table>
         </div>
       </section>

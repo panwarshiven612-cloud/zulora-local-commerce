@@ -1,20 +1,24 @@
 /**
- * Zulora Local — Buyer Orders & Live Tracker v2 (Clean & Production-Ready)
- * Real-time Firestore onSnapshot, 4-step Blinkit stepper, notifications, Buy Again
+ * Zulora Local — Buyer Orders & Live Tracker v3 (Production-Grade)
+ * Real-time Firestore onSnapshot without composite index blocks,
+ * 4-step Blinkit-style stepper, detailed per-km distance/weight breakdown,
+ * post-order seller contact & live delivery receipt verification.
  * Zero fake/demo orders.
  */
 
 import {
   auth, db, googleProvider, signInWithPopup, signOut, onAuthStateChanged,
-  collection, doc, getDoc, updateDoc, serverTimestamp, query, where, orderBy, onSnapshot, isConfigPlaceholder
+  collection, doc, getDoc, updateDoc, serverTimestamp, query, where, onSnapshot, isConfigPlaceholder
 } from './firebase-init.js';
 import { PLATFORM_CONSTANTS } from './config.js';
+import { showUnauthorizedDomainDialog } from './auth.js';
 import { addNotification, loadSavedNotifications, notifyOrderStatus, showToast, triggerBrowserNotification } from './notifications.js';
 
 // ─── State ───────────────────────────────────────────────────────────────────
 let currentUser  = null;
 let userOrders   = [];
 let unsubscribe  = null;
+let unsubscribeFallback = null;
 let prevStatuses = {}; // track status changes for notifications
 
 // ─── DOM ─────────────────────────────────────────────────────────────────────
@@ -40,14 +44,25 @@ function initAuth() {
     return;
   }
 
+  // Show smooth loading state while Firebase restores session from IndexedDB on refresh
+  if (ordersListContainer) {
+    ordersListContainer.innerHTML = `
+      <div style="text-align:center;padding:3rem 1rem;color:var(--slate-500);">
+        <div style="font-size:2rem;margin-bottom:0.5rem;display:inline-block;animation:spin 1s linear infinite;">⌛</div>
+        <p style="font-size:0.9rem;font-weight:600;">Connecting to Zulora Live Order Tracker…</p>
+      </div>
+    `;
+  }
+
   onAuthStateChanged(auth, user => {
     if (user) {
       currentUser = user;
       authPrompt?.classList.add('hidden');
-      listenToLiveOrders(user.uid);
+      listenToLiveOrders(user.uid, user.email);
     } else {
       currentUser = null;
       if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+      if (unsubscribeFallback) { unsubscribeFallback(); unsubscribeFallback = null; }
       userOrders = [];
       authPrompt?.classList.remove('hidden');
       renderOrders();
@@ -64,53 +79,114 @@ async function handleBuyerLogin() {
     await signInWithPopup(auth, googleProvider);
     showToast('Signed in to view your orders!', 'success');
   } catch(e) {
-    if (e.code !== 'auth/popup-closed-by-user') {
+    if (e.code === 'auth/unauthorized-domain') {
+      showUnauthorizedDomainDialog();
+    } else if (e.code !== 'auth/popup-closed-by-user') {
       showToast('Login failed: ' + e.message, 'error');
     }
   }
 }
 
-// ─── Live Orders Stream ───────────────────────────────────────────────────────
-function listenToLiveOrders(buyerUid) {
-  if (!db || isConfigPlaceholder) return;
-  if (unsubscribe) unsubscribe();
+// ─── Live Orders Stream (Single-Field Query: No Missing Index Errors) ─────────
+function listenToLiveOrders(buyerUid, buyerEmail = '') {
+  if (!db || isConfigPlaceholder || !buyerUid) return;
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  if (unsubscribeFallback) { unsubscribeFallback(); unsubscribeFallback = null; }
 
+  // Query strictly on buyerUid WITHOUT orderBy to eliminate compound index requirements
   const q = query(
     collection(db, 'orders'),
-    where('buyerUid', '==', buyerUid),
-    orderBy('createdAt', 'desc')
+    where('buyerUid', '==', buyerUid)
   );
 
   unsubscribe = onSnapshot(q, snapshot => {
-    userOrders = [];
+    const ordersMap = new Map();
+
     snapshot.forEach(d => {
-      const order = { docId: d.id, ...d.data() };
-      // Fire notification on status change
-      const prev = prevStatuses[d.id];
-      if (prev && prev !== order.orderStatus) {
-        notifyOrderStatus(order.orderId || d.id, order.orderStatus);
-        // Also fire browser push notification for status changes
-        const statusMsgs = {
-          'Approved / Confirmed': `✅ Your order #${order.orderId || d.id} has been accepted by the seller!`,
-          'Accepted & Packing': `✅ Seller is packing your order #${order.orderId || d.id}!`,
-          'Packed / Out for Delivery': `🛵 Order #${order.orderId || d.id} is out for delivery!`,
-          'Out for Delivery': `🛵 Order #${order.orderId || d.id} is out for delivery!`,
-          'Delivered': `🎉 Order #${order.orderId || d.id} delivered! Confirm receipt on Zulora.`,
-        };
-        const pushMsg = statusMsgs[order.orderStatus];
-        if (pushMsg) {
-          triggerBrowserNotification('Zulora Local — Order Update', pushMsg, './orders.html');
-        }
-      }
-      prevStatuses[d.id] = order.orderStatus;
-      userOrders.push(order);
+      ordersMap.set(d.id, { docId: d.id, ...d.data() });
     });
-    renderOrders();
+
+    // Check if we need to supplement with fallback on buyerEmail
+    if (ordersMap.size === 0 && buyerEmail) {
+      listenEmailFallback(buyerEmail, ordersMap);
+      return;
+    }
+
+    processAndRenderOrders(Array.from(ordersMap.values()));
   }, err => {
-    console.warn('[Orders] onSnapshot error:', err);
-    userOrders = [];
-    renderOrders();
+    console.warn('[Orders] onSnapshot notice:', err);
+    // If error, try fallback by email
+    if (buyerEmail) {
+      listenEmailFallback(buyerEmail, new Map());
+    } else {
+      userOrders = [];
+      renderOrders();
+    }
   });
+}
+
+function listenEmailFallback(buyerEmail, existingMap) {
+  if (!db || isConfigPlaceholder || !buyerEmail) return;
+  if (unsubscribeFallback) { unsubscribeFallback(); unsubscribeFallback = null; }
+
+  const qEmail = query(
+    collection(db, 'orders'),
+    where('buyerEmail', '==', buyerEmail)
+  );
+
+  unsubscribeFallback = onSnapshot(qEmail, snap => {
+    snap.forEach(d => {
+      existingMap.set(d.id, { docId: d.id, ...d.data() });
+    });
+    processAndRenderOrders(Array.from(existingMap.values()));
+  }, err => {
+    console.warn('[Orders] Email fallback notice:', err);
+    processAndRenderOrders(Array.from(existingMap.values()));
+  });
+}
+
+function processAndRenderOrders(ordersList) {
+  // Sort in memory by createdAt descending
+  ordersList.sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a));
+
+  // Fire notifications for newly changed statuses
+  ordersList.forEach(order => {
+    const id = order.docId;
+    const currentStatus = order.orderStatus || order.status || 'Placed';
+    const prev = prevStatuses[id];
+
+    if (prev && prev !== currentStatus) {
+      notifyOrderStatus(order.orderCode || order.orderId || id, currentStatus);
+      const statusMsgs = {
+        'Confirmed by Merchant': `✅ Your order #${order.orderCode || order.orderId || id} has been confirmed by merchant!`,
+        'Approved / Confirmed': `✅ Your order #${order.orderCode || order.orderId || id} has been accepted by merchant!`,
+        'Accepted & Packing': `📦 Merchant is packing your order #${order.orderCode || order.orderId || id}!`,
+        'Packed / Out for Delivery': `🛵 Order #${order.orderCode || order.orderId || id} is out for delivery!`,
+        'Out for Delivery': `🛵 Order #${order.orderCode || order.orderId || id} is out for delivery!`,
+        'Delivered': `🎉 Order #${order.orderCode || order.orderId || id} delivered! Please confirm delivery on Zulora.`,
+        'Verified Delivered': `✓ Delivery verified for order #${order.orderCode || order.orderId || id}!`,
+        'Cancelled': `✕ Order #${order.orderCode || order.orderId || id} was cancelled.`
+      };
+      const pushMsg = statusMsgs[currentStatus];
+      if (pushMsg) {
+        triggerBrowserNotification('Zulora Local — Live Order Update', pushMsg, './orders.html');
+      }
+    }
+    prevStatuses[id] = currentStatus;
+  });
+
+  userOrders = ordersList;
+  renderOrders();
+}
+
+function getOrderTimestamp(order) {
+  if (!order) return 0;
+  if (order.createdAt?.toMillis) return order.createdAt.toMillis();
+  if (order.createdAt?.seconds) return order.createdAt.seconds * 1000;
+  if (order.createdAtIso) return new Date(order.createdAtIso).getTime();
+  if (typeof order.createdAt === 'number') return order.createdAt;
+  if (typeof order.createdAt === 'string') return new Date(order.createdAt).getTime();
+  return 0;
 }
 
 // ─── Render Orders ────────────────────────────────────────────────────────────
@@ -130,7 +206,7 @@ function renderOrders() {
         <p style="font-size:0.9rem;color:var(--slate-500);margin-bottom:1.5rem;line-height:1.5;">
           You haven't placed any orders yet. Discover fresh food, crops, and local products from neighbourhood sellers!
         </p>
-        <a href="./index.html" class="btn btn-primary btn-lg" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.75rem 1.5rem;border-radius:var(--radius-full);font-weight:700;">
+        <a href="./index.html" class="btn btn-primary btn-lg" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.75rem 1.5rem;border-radius:var(--radius-full);font-weight:700;background:var(--azure-600);border-color:var(--azure-600);">
           Explore Real Products
         </a>
       </div>`;
@@ -138,48 +214,56 @@ function renderOrders() {
   }
 
   ordersListContainer.innerHTML = userOrders.map(order => {
-    const status       = order.orderStatus || 'Placed';
+    const rawStatus    = order.orderStatus || order.status || 'Placed';
+    const status       = normalizeStatus(rawStatus);
     const stepIdx      = getStatusStepIndex(status);
     const progressPct  = getProgressPercentage(stepIdx);
-    const cleanPhone   = (order.sellerPhone || '').replace(/[^0-9]/g, '');
+    const cleanPhone   = (order.shopPhone || order.sellerPhone || '').replace(/[^0-9]/g, '');
     const callUrl      = cleanPhone ? `tel:+91${cleanPhone}` : `tel:${PLATFORM_CONSTANTS.HELPLINE_PHONE}`;
     const waPhone      = cleanPhone ? (cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone) : PLATFORM_CONSTANTS.HELPLINE_WHATSAPP;
-    const waMsg        = encodeURIComponent(`Hi ${order.shopName || 'Seller'}, I have a query about my Zulora order #${order.orderId || order.docId}`);
+    const waMsg        = encodeURIComponent(`Hi ${order.shopName || 'Seller'}, I have a query about my Zulora order #${order.orderCode || order.orderId || order.docId}`);
     const waUrl        = `https://wa.me/${waPhone}?text=${waMsg}`;
 
+    const distDisplay  = (order.distanceKm != null || order.distKm != null) ? `${order.distanceKm ?? order.distKm} km` : 'Local';
+    const delFeeDisplay= order.deliveryCharge || order.baseDeliveryFee || 15;
+    const weightFeeDisplay = (order.extraWeightCharge || order.weightFee || 0);
+
+    const cancelUntil  = order.cancelableUntil || (order.createdAt?.seconds ? order.createdAt.seconds * 1000 + 5*60*1000 : 0);
+    const isCancelable = (status === 'Placed') && Date.now() < cancelUntil;
+
     return `
-      <div class="glass-card" style="padding:1.5rem;margin-bottom:1.5rem;border-radius:var(--radius-lg);">
+      <div class="glass-card" style="padding:1.5rem;margin-bottom:1.5rem;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);border:1px solid var(--border-subtle);">
 
         <!-- Header row -->
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;border-bottom:1px solid var(--slate-200);padding-bottom:1rem;margin-bottom:1rem;">
           <div>
             <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-              <span style="font-size:1.15rem;font-weight:800;color:var(--slate-900);">Order #${escapeHtml(order.orderId || order.docId)}</span>
-              <span class="badge" style="background:var(--azure-100);color:var(--azure-800);font-size:0.75rem;font-weight:700;padding:0.25rem 0.6rem;border-radius:var(--radius-full);">
+              <span style="font-size:1.15rem;font-weight:800;color:var(--slate-900);">Order #${escapeHtml(order.orderCode || order.orderId || order.docId)}</span>
+              <span class="badge" style="background:${getStatusBadgeColor(status)};color:#fff;font-size:0.75rem;font-weight:700;padding:0.25rem 0.6rem;border-radius:var(--radius-full);">
                 ${escapeHtml(status)}
               </span>
             </div>
-            <div style="font-size:0.8rem;color:var(--slate-500);margin-top:0.25rem;">
-              Shop: <strong>${escapeHtml(order.shopName || 'Local Seller')}</strong> • ${formatOrderDate(order.createdAt)}
+            <div style="font-size:0.82rem;color:var(--slate-600);margin-top:0.35rem;">
+              🏪 Merchant: <strong>${escapeHtml(order.shopName || 'Local Seller')}</strong> • ${formatOrderDate(order.createdAt || order.createdAtIso)}
             </div>
             <div style="font-size:0.78rem;color:var(--slate-500);margin-top:0.2rem;">
-              📍 Deliver to: ${escapeHtml(order.buyerAddress || 'Address on file')}
+              📍 Deliver to: ${escapeHtml(order.buyerAddress || 'Address on file')}${order.buyerCityTown ? `, ${escapeHtml(order.buyerCityTown)}` : ''}${order.buyerState ? `, ${escapeHtml(order.buyerState)}` : ''}
             </div>
           </div>
           <div style="text-align:right;">
-            <div style="font-size:1.3rem;font-weight:800;color:var(--azure-800);">₹${order.totalAmount || order.grandTotal || 0}</div>
-            <div style="font-size:0.75rem;color:var(--slate-500);">${escapeHtml(order.paymentMode || order.paymentMethod || 'COD')}</div>
+            <div style="font-size:1.35rem;font-weight:900;color:var(--azure-800);">₹${order.totalAmount || order.grandTotal || 0}</div>
+            <div style="font-size:0.75rem;color:var(--slate-500);font-weight:600;">${escapeHtml(order.paymentMethod || order.paymentMode || 'COD')}</div>
           </div>
         </div>
 
         <!-- 4-Step Blinkit-style Stepper -->
-        <div style="margin:1.5rem 0 1rem;">
-          <div style="font-size:0.82rem;font-weight:700;color:var(--slate-700);margin-bottom:0.75rem;display:flex;align-items:center;gap:0.35rem;">
+        <div style="margin:1.5rem 0 1.25rem;">
+          <div style="font-size:0.84rem;font-weight:700;color:var(--slate-700);margin-bottom:0.75rem;display:flex;align-items:center;gap:0.35rem;">
             ⚡ Live Delivery Status: <span style="color:var(--azure-600);font-weight:800;">${escapeHtml(status)}</span>
           </div>
           <div class="stepper-container" style="display:flex;justify-content:space-between;position:relative;margin:1rem 0;">
             <div class="stepper-bar-fill" style="position:absolute;top:14px;left:0;height:4px;background:var(--azure-500);z-index:1;width:${progressPct}%;transition:width 0.4s;"></div>
-            ${['Placed','Approved / Confirmed','Packed / Out for Delivery','Delivered'].map((label, i) => {
+            ${['Placed','Confirmed by Merchant','Packed / Out for Delivery','Delivered'].map((label, i) => {
               const nodeIdx = i + 1;
               const isCompleted = stepIdx > nodeIdx;
               const isActive = stepIdx === nodeIdx;
@@ -188,7 +272,7 @@ function renderOrders() {
                   <div class="step-circle" style="width:28px;height:28px;border-radius:50%;background:${isCompleted || isActive ? 'var(--azure-600)' : 'var(--slate-200)'};color:${isCompleted || isActive ? '#fff' : 'var(--slate-600)'};display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;margin-bottom:0.35rem;">
                     ${isCompleted ? '✓' : nodeIdx}
                   </div>
-                  <div class="step-label" style="font-size:0.7rem;font-weight:600;color:${isActive ? 'var(--azure-800)' : 'var(--slate-500)'};text-align:center;max-width:70px;">
+                  <div class="step-label" style="font-size:0.7rem;font-weight:600;color:${isActive ? 'var(--azure-800)' : 'var(--slate-500)'};text-align:center;max-width:75px;">
                     ${label}
                   </div>
                 </div>`;
@@ -196,13 +280,25 @@ function renderOrders() {
           </div>
         </div>
 
-        <!-- Seller Contact Bar -->
+        <!-- Per-KM Pricing & Bill Breakdown Bar -->
+        <div style="background:var(--slate-50);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:0.75rem 0.9rem;margin-bottom:1rem;font-size:0.8rem;color:var(--slate-700);display:flex;flex-wrap:wrap;justify-content:space-between;gap:0.5rem;">
+          <div>
+            <span>Items: <strong>₹${order.subtotal || order.itemsSubtotal || 0}</strong></span> • 
+            <span>Distance (${distDisplay}): <strong>₹${delFeeDisplay}</strong></span> • 
+            <span>Weight Surcharge: <strong>${weightFeeDisplay > 0 ? '₹' + weightFeeDisplay : 'FREE (≤2kg)'}</strong></span>
+          </div>
+          <div style="font-weight:800;color:var(--azure-800);">
+            Total: ₹${order.totalAmount || order.grandTotal || 0}
+          </div>
+        </div>
+
+        <!-- Post-Order Seller Contact & Actions Bar -->
         <div style="background:var(--azure-50);border:1px solid var(--azure-200);border-radius:var(--radius-md);padding:0.85rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
           <div>
-            <div style="font-size:0.85rem;font-weight:700;color:var(--azure-900);">Merchant: ${escapeHtml(order.shopName || 'Local Seller')}</div>
+            <div style="font-size:0.85rem;font-weight:700;color:var(--azure-900);">Merchant Direct Contact</div>
             <div style="font-size:0.78rem;color:var(--slate-600);">
-              ${order.sellerPhone ? `📞 +91 ${escapeHtml(order.sellerPhone)}` : ''}
-              ${order.sellerEmail ? ` • 📧 ${escapeHtml(order.sellerEmail)}` : ''}
+              ${order.shopPhone || order.sellerPhone ? `📞 +91 ${escapeHtml(order.shopPhone || order.sellerPhone)}` : ''}
+              ${order.shopEmail || order.sellerEmail ? ` • 📧 ${escapeHtml(order.shopEmail || order.sellerEmail)}` : ''}
             </div>
           </div>
           <div style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;">
@@ -212,15 +308,15 @@ function renderOrders() {
             <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="display:inline-flex;align-items:center;gap:0.3rem;">
               💬 WhatsApp
             </a>
-            ${(order.orderStatus === 'Placed' && Date.now() < (order.cancelableUntil || (order.createdAt?.seconds ? order.createdAt.seconds * 1000 + 5*60*1000 : Date.now())))
-              ? `<button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:var(--radius-full);font-weight:700;" onclick="window.cancelOrder('${order.docId}')">✕ Cancel Order</button>`
+            ${isCancelable
+              ? `<button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:var(--radius-full);font-weight:700;" onclick="window.cancelOrder('${order.docId}')">✕ Cancel Order (5m)</button>`
               : ''}
             <button class="btn btn-primary btn-sm" onclick='window.handleBuyAgain(${JSON.stringify(order.items || [])})'>
               🔁 Buy Again
             </button>
-            ${order.buyerDeliveredConfirmed
+            ${(order.buyerDeliveredConfirmed || status === 'Verified Delivered')
               ? `<span style="background:var(--emerald-50,#ecfdf5);color:var(--emerald-700,#047857);border:1px solid var(--emerald-300,#a7f3d0);padding:0.3rem 0.65rem;border-radius:var(--radius-full);font-size:0.75rem;font-weight:700;display:inline-flex;align-items:center;gap:0.25rem;">✓ Delivery Confirmed</span>`
-              : (order.orderStatus === 'Out for Delivery' || order.orderStatus === 'Delivered')
+              : (status === 'Out for Delivery' || status === 'Delivered' || status === 'Packed / Out for Delivery')
                 ? `<button class="btn btn-sm" style="background:var(--emerald-600,#059669);color:#fff;border-radius:var(--radius-full);font-weight:700;" onclick="window.confirmOrderDelivery('${order.docId}')">✅ Confirm / Verify Delivered</button>`
                 : ''
             }
@@ -276,9 +372,11 @@ window.confirmOrderDelivery = async function(docId) {
   if (!db || isConfigPlaceholder || !docId) return;
   try {
     await updateDoc(doc(db, 'orders', docId), {
-      orderStatus: 'Delivered',
+      orderStatus: 'Verified Delivered',
+      status: 'verified delivered',
       buyerDeliveredConfirmed: true,
-      deliveredAt: serverTimestamp()
+      deliveredAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
     });
     showToast('🎉 Delivery verified! Thank you for shopping on Zulora Local.', 'success');
   } catch (err) {
@@ -300,11 +398,17 @@ window.cancelOrder = async function(docId) {
       showToast('The 5-minute cancellation window has passed. Contact the seller directly.', 'warning');
       return;
     }
-    if (data.orderStatus !== 'Placed') {
+    const curStatus = (data.orderStatus || data.status || '').toLowerCase();
+    if (curStatus !== 'placed') {
       showToast('Order cannot be cancelled — it has already been accepted by the seller.', 'warning');
       return;
     }
-    await updateDoc(orderRef, { orderStatus: 'Cancelled', cancelledAt: serverTimestamp() });
+    await updateDoc(orderRef, {
+      orderStatus: 'Cancelled',
+      status: 'cancelled',
+      cancelledAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
     showToast('Order cancelled successfully.', 'success');
   } catch(err) {
     showToast('Could not cancel order: ' + err.message, 'error');
@@ -312,18 +416,25 @@ window.cancelOrder = async function(docId) {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+function normalizeStatus(st) {
+  if (!st) return 'Placed';
+  const lower = st.toLowerCase().trim();
+  if (lower === 'placed') return 'Placed';
+  if (lower.includes('confirm') || lower.includes('approved') || lower.includes('accepted')) return 'Confirmed by Merchant';
+  if (lower.includes('pack') || lower.includes('out for delivery')) return 'Packed / Out for Delivery';
+  if (lower.includes('verified')) return 'Verified Delivered';
+  if (lower.includes('deliver')) return 'Delivered';
+  if (lower.includes('cancel')) return 'Cancelled';
+  return st;
+}
+
 function getStatusStepIndex(status) {
   switch(status) {
     case 'Placed':
       return 1;
-    case 'Approved / Confirmed':
-    case 'Accepted & Packing':
-    case 'Confirmed':
-    case 'Approved':
+    case 'Confirmed by Merchant':
       return 2;
     case 'Packed / Out for Delivery':
-    case 'Out for Delivery':
-    case 'Packed':
       return 3;
     case 'Delivered':
     case 'Verified Delivered':
@@ -335,6 +446,18 @@ function getStatusStepIndex(status) {
 
 function getProgressPercentage(idx) {
   return [0, 15, 48, 80, 100][idx] || 15;
+}
+
+function getStatusBadgeColor(status) {
+  switch(status) {
+    case 'Placed': return 'var(--azure-600)';
+    case 'Confirmed by Merchant': return 'var(--emerald-600)';
+    case 'Packed / Out for Delivery': return '#d97706';
+    case 'Delivered':
+    case 'Verified Delivered': return 'var(--emerald-700)';
+    case 'Cancelled': return 'var(--rose-600)';
+    default: return 'var(--slate-600)';
+  }
 }
 
 function formatOrderDate(ts) {
