@@ -11,7 +11,7 @@ import {
   isConfigPlaceholder
 } from './firebase-init.js';
 
-import { uploadMultipleImages } from './cloudinary.js';
+import { uploadMultipleImages, uploadSingleImage } from './cloudinary.js';
 import { getCurrentGpsPosition } from './geo-pricing.js';
 import { PLATFORM_CONSTANTS } from './config.js';
 import { showToast } from './notifications.js';
@@ -197,11 +197,20 @@ function populateShopForm(shop) {
 
   setVal('shopName', shop.name || '');
   setVal('shopHandle', shop.handle ? shop.handle.replace(/^@/, '') : '');
+  setVal('shopCity', shop.city || shop.town || '');
   setVal('shopPhone', shop.phone || '');
   setVal('shopUpiId', shop.upiId || '');
   setVal('shopWhatsapp', shop.whatsapp || '');
   setVal('shopDescription', shop.description || '');
   setVal('shopDeliveryRadius', shop.deliveryRadiusKm || 5);
+
+  if (shop.upiQrImageUrl) {
+    const qrEl = document.getElementById('shopQrPreview');
+    if (qrEl) {
+      qrEl.src = shop.upiQrImageUrl;
+      qrEl.classList.remove('hidden');
+    }
+  }
 
   const radiusVal = document.getElementById('shopRadiusVal');
   if (radiusVal) radiusVal.textContent = shop.deliveryRadiusKm || 5;
@@ -291,6 +300,7 @@ async function handleSaveShopProfile(e) {
 
   const name = document.getElementById('shopName')?.value.trim();
   const rawHandle = document.getElementById('shopHandle')?.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  const city = document.getElementById('shopCity')?.value.trim();
   const phone = document.getElementById('shopPhone')?.value.trim();
   const upiId = document.getElementById('shopUpiId')?.value.trim();
   const whatsapp = document.getElementById('shopWhatsapp')?.value.trim();
@@ -315,6 +325,8 @@ async function handleSaveShopProfile(e) {
   const payload = {
     name,
     handle,
+    city: city || 'Local Market',
+    town: city || 'Local Market',
     phone,
     upiId,
     whatsapp,
@@ -325,6 +337,20 @@ async function handleSaveShopProfile(e) {
     agreementsTimestamp: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
+
+  // Upload UPI QR Code Image if new file selected
+  const qrInput = document.getElementById('shopUpiQrImage');
+  if (qrInput && qrInput.files && qrInput.files[0]) {
+    try {
+      showToast('Uploading UPI QR Code image to Cloudinary…', 'info');
+      const uploadRes = await uploadSingleImage(qrInput.files[0]);
+      payload.upiQrImageUrl = uploadRes.url;
+    } catch (err) {
+      console.warn('[Seller] QR upload notice:', err);
+    }
+  } else if (currentShop.upiQrImageUrl) {
+    payload.upiQrImageUrl = currentShop.upiQrImageUrl;
+  }
 
   if (currentShop.lat != null) payload.lat = currentShop.lat;
   if (currentShop.lng != null) payload.lng = currentShop.lng;
@@ -619,7 +645,7 @@ function listenToSellerOrders(shopId, sellerUid) {
 }
 
 function renderSellerOrders() {
-  const container = document.getElementById('sellerOrdersContainer');
+  const container = document.getElementById('liveOrdersContainer') || document.getElementById('sellerOrdersContainer');
   if (!container) return;
 
   if (liveOrders.length === 0) {

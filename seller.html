@@ -518,13 +518,30 @@
           </div>
 
           <div class="form-group">
+            <label for="shopCity">City / Town / Village *</label>
+            <input type="text" id="shopCity" placeholder="e.g. Haldwani, Nainital, Rampur" />
+          </div>
+
+          <div class="form-group">
             <label for="shopPhone">Phone Number</label>
             <input type="tel" id="shopPhone" placeholder="e.g. 9876543210" />
           </div>
 
           <div class="form-group">
+            <label for="shopWhatsapp">WhatsApp Number</label>
+            <input type="tel" id="shopWhatsapp" placeholder="e.g. 9876543210" />
+          </div>
+
+          <div class="form-group">
             <label for="shopUpiId">UPI ID (for payments)</label>
             <input type="text" id="shopUpiId" placeholder="e.g. seller@upi" />
+          </div>
+
+          <div class="form-group form-full">
+            <label for="shopUpiQrImage">Upload Store UPI QR Code Image (Cloudinary)</label>
+            <input type="file" id="shopUpiQrImage" accept="image/*" style="font-size:0.85rem;" />
+            <p class="text-sm" style="margin-top:0.25rem;">Buyers will only see a QR code if you upload one here; otherwise buyers will see your UPI ID.</p>
+            <img id="shopQrPreview" src="" alt="Current QR Code" class="hidden" style="width:110px;height:110px;object-fit:contain;border:1px solid var(--slate-300);border-radius:var(--radius-sm);margin-top:0.5rem;" />
           </div>
 
           <div class="form-group form-full">

@@ -167,7 +167,7 @@ function renderOrders() {
           </div>
           <div class="stepper-container" style="display:flex;justify-content:space-between;position:relative;margin:1rem 0;">
             <div class="stepper-bar-fill" style="position:absolute;top:14px;left:0;height:4px;background:var(--azure-500);z-index:1;width:${progressPct}%;transition:width 0.4s;"></div>
-            ${['Placed','Accepted & Packing','Out for Delivery','Delivered'].map((label, i) => {
+            ${['Placed','Approved / Confirmed','Packed / Out for Delivery','Delivered'].map((label, i) => {
               const nodeIdx = i + 1;
               const isCompleted = stepIdx > nodeIdx;
               const isActive = stepIdx === nodeIdx;
@@ -302,11 +302,22 @@ window.cancelOrder = async function(docId) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getStatusStepIndex(status) {
   switch(status) {
-    case 'Placed':              return 1;
-    case 'Accepted & Packing':  return 2;
-    case 'Out for Delivery':    return 3;
-    case 'Delivered':           return 4;
-    default:                    return 1;
+    case 'Placed':
+      return 1;
+    case 'Approved / Confirmed':
+    case 'Accepted & Packing':
+    case 'Confirmed':
+    case 'Approved':
+      return 2;
+    case 'Packed / Out for Delivery':
+    case 'Out for Delivery':
+    case 'Packed':
+      return 3;
+    case 'Delivered':
+    case 'Verified Delivered':
+      return 4;
+    default:
+      return 1;
   }
 }
 

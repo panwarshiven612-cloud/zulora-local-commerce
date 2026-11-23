@@ -1,0 +1,109 @@
+/* ==========================================================================
+   Zulora Local — Reset Stylesheet (css/reset.css)
+   Strict Reset, Zero Horizontal Overflow, GPU Touch & Asset Discipline
+   ========================================================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  background-color: #F8FAFC;
+  color: #0F172A;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  line-height: 1.5;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Touch & Tap optimization: Remove 300ms mobile tap lag */
+button, a, [role="button"], .product-card, .category-pill, .menu-nav-item, .qty-btn, .btn-add-cart {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+ul, ol {
+  list-style: none;
+}
+
+input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ─── Strict Asset Discipline: Brand Logo (34px) ─────────────────────────── */
+img.navbar-logo,
+img.brand-logo,
+img.header-logo,
+img.footer-logo,
+img.auth-gate-logo,
+img.pwa-install-logo,
+.navbar-brand img,
+.brand-wrapper img,
+img[src*="IMG-20260531-172651"] {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  max-width: 34px !important;
+  min-height: 34px !important;
+  max-height: 34px !important;
+  object-fit: cover !important;
+  border-radius: 8px !important;
+  display: block !important;
+  flex-shrink: 0 !important;
+}
+
+/* ─── Strict Asset Discipline: Verified Blue Tick Badge (15px) ────────────── */
+img.verified-badge,
+img.verified-badge-sm,
+.verified-badge,
+.verified-badge-sm,
+img[src*="LS20260530205459"] {
+  width: 15px !important;
+  height: 15px !important;
+  min-width: 15px !important;
+  max-width: 15px !important;
+  min-height: 15px !important;
+  max-height: 15px !important;
+  object-fit: contain !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  margin-left: 3px !important;
+}
