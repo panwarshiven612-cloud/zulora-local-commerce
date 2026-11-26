@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Supreme Admin Panel — Zulora Local</title>
   <meta name="description" content="Zulora Local Supreme Admin Control Panel. Strictly restricted to zulora.help@gmail.com." />
   <meta name="theme-color" content="#0284C7" />
@@ -178,7 +178,7 @@
       </section>
 
       <!-- Registered Platform Users -->
-      <section class="glass-card" style="padding:1.5rem;margin-bottom:3rem;">
+      <section class="glass-card" style="padding:1.5rem;margin-bottom:2rem;">
         <div class="section-header">
           <div class="section-title"><span>👥</span> Registered Platform Users</div>
           <span style="font-size:.75rem;color:var(--slate-500);">All authenticated buyers &amp; merchants</span>
@@ -194,6 +194,28 @@
               </tr>
             </thead>
             <tbody id="usersTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Customer & Seller Feedback -->
+      <section class="glass-card" style="padding:1.5rem;margin-bottom:3rem;">
+        <div class="section-header">
+          <div class="section-title"><span>💬</span> Customer &amp; Seller Feedback</div>
+          <span style="font-size:.75rem;color:var(--slate-500);">Live ratings &amp; support messages</span>
+        </div>
+        <div style="overflow-x:auto;margin-top:1rem;">
+          <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
+            <thead>
+              <tr style="border-bottom:2px solid var(--slate-200);color:var(--slate-600);">
+                <th style="padding:.7rem .5rem;text-align:left;">User</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Topic / Order</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Rating</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Message</th>
+                <th style="padding:.7rem .5rem;text-align:left;">Date</th>
+              </tr>
+            </thead>
+            <tbody id="feedbackTableBody"></tbody>
           </table>
         </div>
       </section>

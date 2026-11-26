@@ -1,14 +1,16 @@
 /**
- * Zulora Local — Hyperlocal Geo-Pricing Engine v2
+ * Zulora Local — Hyperlocal Geo-Pricing & Profile Persistence Engine v3
  */
 import { PLATFORM_CONSTANTS } from './config.js';
 
 export function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
   if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null;
+  const nLat1 = Number(lat1), nLon1 = Number(lon1), nLat2 = Number(lat2), nLon2 = Number(lon2);
+  if ([nLat1, nLon1, nLat2, nLon2].some(isNaN)) return null;
   const R = 6371;
-  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-  return Math.round(2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 10) / 10;
+  const dLat = toRad(nLat2 - nLat1), dLon = toRad(nLon2 - nLon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(nLat1)) * Math.cos(toRad(nLat2)) * Math.sin(dLon / 2) ** 2;
+  return Math.round(2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
 }
 
 function toRad(d) { return d * Math.PI / 180; }
@@ -18,7 +20,7 @@ export function getEstimatedDeliveryTime(distKm) {
   if (distKm <= 1)  return '10–15 mins';
   if (distKm <= 2)  return '15–20 mins';
   if (distKm <= 6)  return '20–30 mins';
-  const mn = Math.round(25 + (distKm-6)*3), mx = Math.round(35 + (distKm-6)*4);
+  const mn = Math.round(25 + (distKm - 6) * 3), mx = Math.round(35 + (distKm - 6) * 4);
   return `${mn}–${mx} mins`;
 }
 
@@ -52,7 +54,6 @@ let _geoCache = null;
 /**
  * Calls Nominatim (OpenStreetMap) reverse geocoder.
  * Returns { town, region, country } or null on failure.
- * Rate limit: 1 req/sec — cached per session.
  */
 async function reverseGeocode(lat, lng) {
   if (_geoCache && _geoCache.lat === lat && _geoCache.lng === lng) return _geoCache.result;
@@ -67,7 +68,8 @@ async function reverseGeocode(lat, lng) {
     const town = addr.city || addr.town || addr.village || addr.municipality || addr.county || addr.state_district || '';
     const region = addr.state || addr.region || '';
     const country = addr.country || '';
-    const result = { town: town || `${lat.toFixed(4)}, ${lng.toFixed(4)}`, region, country };
+    const street = [addr.house_number, addr.road, addr.suburb || addr.neighbourhood].filter(Boolean).join(', ');
+    const result = { town: town || `${lat.toFixed(4)}, ${lng.toFixed(4)}`, region, country, street };
     _geoCache = { lat, lng, result };
     return result;
   } catch (e) {
@@ -87,7 +89,6 @@ export async function getCurrentGpsPosition() {
         const lat = p.coords.latitude;
         const lng = p.coords.longitude;
         const accuracy = p.coords.accuracy;
-        // Try to resolve real city/town name first
         try {
           const geo = await reverseGeocode(lat, lng);
           resolve({
@@ -95,13 +96,14 @@ export async function getCurrentGpsPosition() {
             town: geo ? geo.town : `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
             region: geo ? geo.region : '',
             country: geo ? geo.country : '',
+            street: geo ? geo.street : '',
             isManual: false
           });
         } catch (_) {
           resolve({
             lat, lng, accuracy,
             town: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-            region: '', country: '',
+            region: '', country: '', street: '',
             isManual: false
           });
         }
@@ -109,7 +111,7 @@ export async function getCurrentGpsPosition() {
       err => {
         const saved = getSavedUserLocation();
         if (saved && saved.lat != null) resolve(saved);
-        else reject(new Error('GPS permission denied or unavailable. Please enter your location manually.'));
+        else reject(new Error('GPS permission denied or unavailable. Please enter your City/Town manually.'));
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
@@ -120,14 +122,34 @@ export function saveUserLocation(loc) {
   try {
     if (loc) localStorage.setItem('zulora_user_location', JSON.stringify(loc));
     else localStorage.removeItem('zulora_user_location');
-  } catch(e) {}
+  } catch (e) {}
 }
 
 export function getSavedUserLocation() {
   try {
     const raw = localStorage.getItem('zulora_user_location');
     return raw ? JSON.parse(raw) : null;
-  } catch(e) {
+  } catch (e) {
     return null;
+  }
+}
+
+export function saveUserProfile(profile) {
+  try {
+    if (profile) {
+      const existing = getSavedUserProfile() || {};
+      localStorage.setItem('zulora_user_profile', JSON.stringify({ ...existing, ...profile }));
+    } else {
+      localStorage.removeItem('zulora_user_profile');
+    }
+  } catch (e) {}
+}
+
+export function getSavedUserProfile() {
+  try {
+    const raw = localStorage.getItem('zulora_user_profile');
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
   }
 }

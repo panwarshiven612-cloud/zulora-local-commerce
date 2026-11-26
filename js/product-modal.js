@@ -1,7 +1,7 @@
 /**
  * Zulora Local — Product Detail Modal Engine (js/product-modal.js)
  * High-converting quick-commerce product detail view:
- * Multi-image carousel, delivery ETA, store distance, and clean 2-action cards.
+ * Multi-image carousel, delivery ETA, store distance & radius comparison.
  */
 
 import { PLATFORM_CONSTANTS } from './config.js';
@@ -24,30 +24,32 @@ export function openProductDetailModal({
     ? product.images
     : (product.imageUrl ? [product.imageUrl] : ['https://via.placeholder.com/400x400?text=Product+Image']);
 
-  // Pre-order: seller contact is hidden — shown only after order placement on orders.html
-
   const distKm = (userLocation?.lat != null && shop.lat != null)
     ? calculateHaversineDistance(userLocation.lat, userLocation.lng, shop.lat, shop.lng)
     : null;
   const eta = getEstimatedDeliveryTime(distKm);
   const deliveryRadius = shop.deliveryRadiusKm ?? PLATFORM_CONSTANTS.DEFAULT_DELIVERY_RADIUS_KM;
   const isOutOfRadius = distKm != null && distKm > deliveryRadius;
+  const shopCity = shop.city || shop.town || '';
 
   const hasDiscount = product.mrp && product.mrp > product.price;
   const discountPct = hasDiscount ? Math.round(((product.mrp - product.price) / product.mrp) * 100) : 0;
-  const outOfStock = (product.stock != null && product.stock <= 0);
+  const stockVal = product.stock != null ? product.stock : product.stockCount;
+  const outOfStock = (stockVal != null && stockVal <= 0);
 
-  // Verified blue tick badge strictly 15px
   const verifiedBadgeHtml = isVerified
-    ? `<img src="${escapeHtml(PLATFORM_CONSTANTS.VERIFIED_BADGE_URL)}" class="verified-badge-sm" title="Verified Seller" alt="✓" />`
+    ? `<img src="${escapeHtml(PLATFORM_CONSTANTS.VERIFIED_BADGE_URL)}" class="verified-badge-sm" title="Verified Authorized Seller" alt="✓" />`
     : '';
 
-  // Carousel indicators if multiple images
   const dotsHtml = rawImages.length > 1
     ? `<div class="carousel-dots" style="bottom:10px;">
         ${rawImages.map((_, i) => `<span class="carousel-dot ${i === 0 ? 'active' : ''}" data-idx="${i}"></span>`).join('')}
        </div>`
     : '';
+
+  const distanceBadgeText = distKm != null
+    ? `📍 ${distKm} km from you`
+    : (shopCity ? `📍 ${escapeHtml(shopCity)}` : '📍 Set GPS to calculate km');
 
   const modal = document.createElement('div');
   modal.id = 'productDetailModal';
@@ -68,33 +70,31 @@ export function openProductDetailModal({
         <div class="product-modal-gallery img-carousel" id="modalCarousel" data-idx="0">
           <img id="modalCarouselImg" src="${escapeHtml(rawImages[0])}" alt="${escapeHtml(product.title)}" />
           ${rawImages.length > 1 ? `
-            <button class="carousel-prev" id="btnModalPrev" aria-label="Previous image" style="opacity:1;">‹</button>
-            <button class="carousel-next" id="btnModalNext" aria-label="Next image" style="opacity:1;">›</button>
+            <button class="carousel-prev" id="btnModalPrev" aria-label="Previous image">‹</button>
+            <button class="carousel-next" id="btnModalNext" aria-label="Next image">›</button>
             ${dotsHtml}
           ` : ''}
         </div>
 
         <div style="padding-top:1rem;">
           <!-- Store & Distance info -->
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.6rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.65rem;">
             <div style="display:flex;align-items:center;gap:0.3rem;">
-              <span style="font-size:0.84rem;font-weight:700;color:var(--azure-800);">
-                🏪 ${escapeHtml(shop.name || 'Local Seller')}
+              <span style="font-size:0.86rem;font-weight:800;color:var(--azure-800);">
+                🏪 ${escapeHtml(shop.name || product.shopName || 'Neighbourhood Seller')}
               </span>
               ${verifiedBadgeHtml}
             </div>
-            <div style="display:flex;align-items:center;gap:0.4rem;">
-              <span class="badge badge-distance">
-                ${distKm != null ? `📍 ${distKm} km` : '📍 Neighbourhood Store'}
-              </span>
+            <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+              <span class="badge badge-distance">${distanceBadgeText}</span>
               <span class="badge badge-time">${eta}</span>
             </div>
           </div>
 
-          <!-- Radius Alert if beyond delivery radius -->
+          <!-- Radius Alert -->
           ${isOutOfRadius ? `
-            <div style="background:#fffbeb;border:1px solid #fef3c7;border-radius:var(--radius-sm);padding:0.4rem 0.6rem;font-size:0.75rem;color:#b45309;margin-bottom:0.75rem;">
-              ⚠️ This store standard delivery range is ${deliveryRadius} km (${distKm} km away). Seller delivers directly.
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:var(--radius-sm);padding:0.45rem 0.65rem;font-size:0.75rem;color:#92400e;margin-bottom:0.75rem;">
+              ⚠️ This store's standard delivery radius is ${deliveryRadius} km (you are ${distKm} km away). Delivery fee scales with distance.
             </div>
           ` : ''}
 
@@ -102,22 +102,23 @@ export function openProductDetailModal({
           <div class="product-modal-pricing">
             <span class="product-modal-price">₹${product.price}</span>
             ${hasDiscount ? `<span class="product-modal-mrp">₹${product.mrp}</span>` : ''}
-            ${hasDiscount ? `<span class="product-modal-discount">${discountPct}% off</span>` : ''}
+            ${hasDiscount ? `<span class="product-modal-discount">${discountPct}% OFF</span>` : ''}
           </div>
 
           <!-- Description -->
           <p class="product-modal-desc">
-            ${escapeHtml(product.description || 'Freshly prepared and packaged by verified local merchant for immediate doorstep delivery.')}
+            ${escapeHtml(product.description || 'Freshly prepared and packaged by this neighbourhood merchant for direct doorstep delivery.')}
           </p>
 
           <!-- Specifications -->
           <div style="font-size:0.8rem;color:var(--slate-600);background:var(--slate-50);border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:0.75rem;margin-bottom:1rem;display:flex;flex-direction:column;gap:0.35rem;">
-            <span>📦 <strong>Unit / Packaging:</strong> ${escapeHtml(product.unit || '1 pc')} (${product.weightKg || product.weight || 0.5} kg)</span>
-            <span>🏪 <strong>Store Location:</strong> ${escapeHtml(shop.city || shop.town || 'Local Market')} (Delivery Radius: ${deliveryRadius} km)</span>
-            <span>📊 <strong>Availability:</strong> ${outOfStock ? '<strong style="color:var(--rose-600);">Out of Stock</strong>' : `<strong>${product.stock} items left in stock</strong>`}</span>
+            <span>📦 <strong>Unit / Weight:</strong> ${escapeHtml(product.unit || '1 pc')} (${product.weightKg || product.weight || 0.5} kg)</span>
+            <span>🏪 <strong>Store Area:</strong> ${escapeHtml(shopCity || 'Location on file')}${shop.state ? `, ${escapeHtml(shop.state)}` : ''} • Delivery Radius: ${deliveryRadius} km</span>
+            <span>🚚 <strong>Distance Rate:</strong> ₹${shop.perKmRate || 15}/km (First 2 kg free, +₹10/km extra kg)</span>
+            <span>📊 <strong>Availability:</strong> ${outOfStock ? '<strong style="color:var(--rose-600);">Out of Stock</strong>' : `<strong>${stockVal ?? 'In stock'} left</strong>`}</span>
           </div>
 
-          <!-- 2 Clean Action Cards: Cart + View Store (contact hidden pre-order) -->
+          <!-- Action Buttons -->
           <div class="product-modal-actions">
             <div id="modalCartActionWrap" style="flex:1.5;">
               ${outOfStock
@@ -128,7 +129,7 @@ export function openProductDetailModal({
                       <span class="qty-count" style="font-size:0.95rem;">${cartQty}</span>
                       <button class="qty-btn" id="btnModalQtyPlus" style="width:30px;height:30px;">+</button>
                     </div>`
-                  : `<button class="btn btn-primary" id="btnModalAddToCart" style="width:100%;padding:0.65rem;font-size:0.88rem;background:var(--emerald-600);border-color:var(--emerald-600);">
+                  : `<button class="btn btn-success" id="btnModalAddToCart" style="width:100%;padding:0.65rem;font-size:0.88rem;">
                       🛒 Add to Cart
                     </button>`
               }
@@ -142,7 +143,7 @@ export function openProductDetailModal({
           </div>
 
           <div style="margin-top:0.6rem;font-size:0.72rem;color:var(--slate-400);text-align:center;">
-            🔒 Seller contact is shown after placing your order
+            🔒 Direct merchant phone &amp; WhatsApp appear immediately after order placement
           </div>
         </div>
       </div>
@@ -150,10 +151,9 @@ export function openProductDetailModal({
   `;
   document.body.appendChild(modal);
 
-  // Close handler
   modal.querySelector('#btnCloseProdModal')?.addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
 
-  // Carousel controls
   let curImgIdx = 0;
   const imgEl = modal.querySelector('#modalCarouselImg');
   const dots = modal.querySelectorAll('.carousel-dot');
@@ -173,7 +173,6 @@ export function openProductDetailModal({
     setImg(curImgIdx + 1);
   });
 
-  // Action listeners
   modal.querySelector('#btnModalAddToCart')?.addEventListener('click', () => {
     if (onAddToCart) onAddToCart(product.id);
     modal.remove();

@@ -2,11 +2,24 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper: Supreme Admin Check
+    // Helper: Supreme Admin Check (case-insensitive)
     function isSupremeAdmin() {
-      return request.auth != null && 
-        (request.auth.token.email == 'zulora.help@gmail.com' || 
-         (request.auth.token.email_verified == true && request.auth.token.email == 'zulora.help@gmail.com'));
+      return request.auth != null &&
+        request.auth.token.email != null &&
+        request.auth.token.email.lower() == 'zulora.help@gmail.com';
+    }
+
+    // Helper: Product Owner or Shop Owner Check
+    function isProductOwner() {
+      return request.auth != null && (
+        resource.data.ownerUid == request.auth.uid ||
+        resource.data.sellerUid == request.auth.uid ||
+        resource.data.shopId == request.auth.uid ||
+        (resource.data.shopId is string &&
+          exists(/databases/$(database)/documents/shops/$(resource.data.shopId)) &&
+          (get(/databases/$(database)/documents/shops/$(resource.data.shopId)).data.ownerUid == request.auth.uid ||
+           get(/databases/$(database)/documents/shops/$(resource.data.shopId)).data.sellerUid == request.auth.uid))
+      );
     }
 
     // Users Collection
@@ -18,44 +31,53 @@ service cloud.firestore {
     // Shops Collection
     match /shops/{shopId} {
       allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && 
-        (resource.data.ownerUid == request.auth.uid || 
-         resource.data.sellerUid == request.auth.uid || 
-         shopId == request.auth.uid || 
+      allow create: if request.auth != null &&
+        (request.resource.data.ownerUid == request.auth.uid ||
+         request.resource.data.sellerUid == request.auth.uid ||
+         shopId == request.auth.uid ||
+         isSupremeAdmin());
+      allow update, delete: if request.auth != null &&
+        (resource.data.ownerUid == request.auth.uid ||
+         resource.data.sellerUid == request.auth.uid ||
+         shopId == request.auth.uid ||
          isSupremeAdmin());
     }
 
     // Products Collection
     match /products/{productId} {
       allow read: if true;
-      allow create: if request.auth != null;
-      // Allow updates by merchant/admin, or inventory stock decrement upon order placement
-      allow update: if (request.auth != null && 
-        (resource.data.ownerUid == request.auth.uid || 
-         resource.data.sellerUid == request.auth.uid || 
-         resource.data.shopId == request.auth.uid || 
-         isSupremeAdmin())) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'salesCount', 'inStock']));
-      // Strict deletion: Only product owners (ownerUid/sellerUid/shopId) or Supreme Admin
-      allow delete: if request.auth != null && 
-        (resource.data.ownerUid == request.auth.uid || 
-         resource.data.sellerUid == request.auth.uid || 
-         resource.data.shopId == request.auth.uid || 
+      allow create: if request.auth != null &&
+        (request.resource.data.ownerUid == request.auth.uid ||
+         request.resource.data.sellerUid == request.auth.uid ||
+         request.resource.data.shopId == request.auth.uid ||
          isSupremeAdmin());
+      // Allow updates by merchant/admin, OR stock/sales decrement during checkout
+      allow update: if isProductOwner() || isSupremeAdmin() ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'stockCount', 'salesCount', 'inStock']));
+      // Strict deletion: product owner, owning shop owner, or Supreme Admin
+      allow delete: if isProductOwner() || isSupremeAdmin();
     }
 
     // Orders Collection
     match /orders/{orderId} {
       allow read: if true;
-      allow create: if true; // Enables guest COD + signed-in buyer checkout
-      // Allow merchant confirmation, status progression, or buyer delivery verification
-      allow update: if true;
-      // Orders can be deleted by merchant or Supreme Admin
-      allow delete: if request.auth != null && 
-        (resource.data.sellerUid == request.auth.uid || 
-         resource.data.shopId == request.auth.uid || 
+      allow create: if true;
+      allow update: if request.auth != null &&
+        (resource.data.sellerUid == request.auth.uid ||
+         resource.data.buyerUid == request.auth.uid ||
+         resource.data.shopId == request.auth.uid ||
          isSupremeAdmin());
+      allow delete: if request.auth != null &&
+        (resource.data.sellerUid == request.auth.uid ||
+         resource.data.shopId == request.auth.uid ||
+         isSupremeAdmin());
+    }
+
+    // Feedback Collection (Customer & Seller Feedback)
+    match /feedback/{fbId} {
+      allow read: if request.auth != null;
+      allow create: if true;
+      allow update, delete: if isSupremeAdmin();
     }
   }
 }

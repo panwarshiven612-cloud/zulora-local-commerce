@@ -6,13 +6,13 @@
 import {
   auth, db, googleProvider,
   signInWithPopup, signOut, onAuthStateChanged,
-  collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc,
+  collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
   query, where, orderBy, onSnapshot, serverTimestamp, arrayUnion,
   isConfigPlaceholder
 } from './firebase-init.js';
 
 import { uploadMultipleImages, uploadSingleImage } from './cloudinary.js';
-import { getCurrentGpsPosition } from './geo-pricing.js';
+import { getCurrentGpsPosition, getSavedUserLocation } from './geo-pricing.js';
 import { PLATFORM_CONSTANTS } from './config.js';
 import { showToast, triggerBrowserNotification, requestNotificationPermission } from './notifications.js';
 import { showUnauthorizedDomainDialog } from './auth.js';
@@ -25,9 +25,12 @@ let liveOrders = [];
 let unsubscribeOrders = null;
 let unsubscribeProducts = null;
 let unsubscribeOwnerProds = null;
+let unsubscribeShopProds = null;
 let unsubscribeSellerUid = null;
+let unsubscribeShopDoc = null;
 let selectedFiles = []; // Array of files from multi-image input
 let activeOrderFilter = 'all';
+let onbGpsCoords = null;
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -97,6 +100,10 @@ function setupEventListeners() {
       renderSellerOrders();
     });
   });
+
+  // Authorized Seller Onboarding controls
+  document.getElementById('btnOnbCaptureGps')?.addEventListener('click', handleCaptureOnboardingGps);
+  document.getElementById('sellerOnboardingForm')?.addEventListener('submit', handleCompleteOnboarding);
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -120,7 +127,6 @@ function initAuth() {
     clearTimeout(authTimeout);
     if (user) {
       currentSeller = user;
-      showDashboard(user);
       loadOrCreateShop(user);
     } else {
       currentSeller = null;
@@ -159,10 +165,7 @@ async function handleSellerLogout() {
   const step2 = confirm('Final check: Log out now? Your shop will stay saved on Zulora.');
   if (!step2) return;
   try {
-    if (unsubscribeOrders) { unsubscribeOrders(); unsubscribeOrders = null; }
-    if (unsubscribeSellerUid) { unsubscribeSellerUid(); unsubscribeSellerUid = null; }
-    if (unsubscribeProducts) { unsubscribeProducts(); unsubscribeProducts = null; }
-    if (unsubscribeOwnerProds) { unsubscribeOwnerProds(); unsubscribeOwnerProds = null; }
+    detachAllSellerListeners();
     if (auth && !isConfigPlaceholder) await signOut(auth);
     currentSeller = null;
     currentShop = null;
@@ -175,17 +178,52 @@ async function handleSellerLogout() {
   }
 }
 
+function detachAllSellerListeners() {
+  if (unsubscribeOrders) { unsubscribeOrders(); unsubscribeOrders = null; }
+  if (unsubscribeSellerUid) { unsubscribeSellerUid(); unsubscribeSellerUid = null; }
+  if (unsubscribeProducts) { unsubscribeProducts(); unsubscribeProducts = null; }
+  if (unsubscribeOwnerProds) { unsubscribeOwnerProds(); unsubscribeOwnerProds = null; }
+  if (unsubscribeShopProds) { unsubscribeShopProds(); unsubscribeShopProds = null; }
+  if (unsubscribeShopDoc) { unsubscribeShopDoc(); unsubscribeShopDoc = null; }
+}
+
 function showDashboard(user) {
   const loading = document.getElementById('authConnectingState');
   if (loading) { loading.classList.add('hidden'); loading.style.display = 'none'; }
   const authSec = document.getElementById('authSection');
   if (authSec) { authSec.classList.add('hidden'); authSec.style.display = 'none'; }
+  const onbSec = document.getElementById('sellerOnboardingSection');
+  if (onbSec) { onbSec.classList.add('hidden'); onbSec.style.display = 'none'; }
   const dash = document.getElementById('dashboardSection');
   if (dash) { dash.classList.remove('hidden'); dash.style.display = 'block'; }
   document.getElementById('btnSellerLogout')?.classList.remove('hidden');
   const nameEl = document.getElementById('sellerNameDisplay');
-  if (nameEl) nameEl.textContent = user.displayName || user.email || 'Seller';
+  if (nameEl) nameEl.textContent = currentShop?.name || user.displayName || user.email || 'Seller';
+  const verEl = document.getElementById('sellerVerifiedBadge');
+  if (verEl) verEl.classList.toggle('hidden', !currentShop?.isVerified);
   requestNotificationPermission().catch(() => {});
+}
+
+function showOnboardingGate(user) {
+  const loading = document.getElementById('authConnectingState');
+  if (loading) { loading.classList.add('hidden'); loading.style.display = 'none'; }
+  const authSec = document.getElementById('authSection');
+  if (authSec) { authSec.classList.add('hidden'); authSec.style.display = 'none'; }
+  const dash = document.getElementById('dashboardSection');
+  if (dash) { dash.classList.add('hidden'); dash.style.display = 'none'; }
+  const onbSec = document.getElementById('sellerOnboardingSection');
+  if (onbSec) { onbSec.classList.remove('hidden'); onbSec.style.display = 'block'; }
+  document.getElementById('btnSellerLogout')?.classList.remove('hidden');
+
+  // Pre-fill onboarding fields from saved user location/profile
+  const savedLoc = getSavedUserLocation();
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el && !el.value && v) el.value = v; };
+  const rawHandle = (user.displayName || (user.email ? user.email.split('@')[0] : 'shop'))
+    .toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 20);
+  setVal('onbShopHandle', rawHandle);
+  if (savedLoc?.town && savedLoc.town !== 'All Locations') setVal('onbShopCity', savedLoc.town);
+  if (savedLoc?.region) setVal('onbShopState', savedLoc.region);
+  if (savedLoc?.phone) setVal('onbShopPhone', savedLoc.phone);
 }
 
 function showAuthGate() {
@@ -193,67 +231,172 @@ function showAuthGate() {
   if (loading) { loading.classList.add('hidden'); loading.style.display = 'none'; }
   const authSec = document.getElementById('authSection');
   if (authSec) { authSec.classList.remove('hidden'); authSec.style.display = 'flex'; }
+  const onbSec = document.getElementById('sellerOnboardingSection');
+  if (onbSec) { onbSec.classList.add('hidden'); onbSec.style.display = 'none'; }
   const dash = document.getElementById('dashboardSection');
   if (dash) { dash.classList.add('hidden'); dash.style.display = 'none'; }
   document.getElementById('btnSellerLogout')?.classList.add('hidden');
 }
 
-// ─── Shop Profile ─────────────────────────────────────────────────────────────
+function isShopAuthorized(shop) {
+  if (!shop) return false;
+  return Boolean(
+    shop.isAuthorizedSeller === true ||
+    shop.agreementsAccepted === true ||
+    (shop.phone && shop.phone.trim().length >= 7)
+  );
+}
+
+// ─── Shop Profile & Authorized Seller Gate ────────────────────────────────────
 async function loadOrCreateShop(user) {
   if (!db || isConfigPlaceholder) return;
   try {
-    const shopRef = doc(db, 'shops', user.uid);
-    const snap = await getDoc(shopRef);
+    let shopSnap = await getDoc(doc(db, 'shops', user.uid));
+    let foundShop = shopSnap.exists() ? { id: shopSnap.id, ...shopSnap.data() } : null;
 
-    if (snap.exists()) {
-      currentShop = { id: snap.id, ...snap.data() };
-      populateShopForm(currentShop);
-    } else {
-      // Create new initial shop document for this user
-      const rawHandle = (user.displayName || user.email.split('@')[0])
-        .toLowerCase()
-        .replace(/[^a-z0-9_]/g, '_')
-        .slice(0, 20);
-
-      const initial = {
-        ownerUid: user.uid,
-        sellerUid: user.uid,
-        ownerEmail: user.email || '',
-        name: user.displayName ? `${user.displayName}'s Shop` : 'Local Shop',
-        handle: `@${rawHandle}`,
-        phone: '',
-        upiId: '',
-        whatsapp: '',
-        category: 'Food',
-        deliveryRadiusKm: 5,
-        perKmRate: 15,
-        description: 'Quality local products delivered quickly.',
-        lat: null,
-        lng: null,
-        isOpen: true,
-        isVerified: false,
-        customCategories: [],
-        createdAt: serverTimestamp()
-      };
-      await setDoc(shopRef, initial);
-      currentShop = { id: user.uid, ...initial };
-      populateShopForm(currentShop);
+    if (!foundShop) {
+      // Fallback: check if user owns a shop under another document ID
+      const qOwner = query(collection(db, 'shops'), where('ownerUid', '==', user.uid));
+      const qSnap = await getDocs(qOwner);
+      if (!qSnap.empty) {
+        const d = qSnap.docs[0];
+        foundShop = { id: d.id, ...d.data() };
+      }
     }
 
-    // Listen to real products and live orders
-    listenToSellerProducts(user.uid);
-    listenToSellerOrders(currentShop.id, user.uid);
+    if (foundShop && isShopAuthorized(foundShop)) {
+      currentShop = foundShop;
+      showDashboard(user);
+      populateShopForm(currentShop);
+      attachShopRealtimeListener(currentShop.id);
+      listenToSellerProducts(user.uid, currentShop.id);
+      listenToSellerOrders(currentShop.id, user.uid);
+    } else {
+      currentShop = foundShop;
+      showOnboardingGate(user);
+    }
   } catch (err) {
     console.error('[Seller] loadOrCreateShop error:', err);
-    showToast('Error loading shop profile from Firestore: ' + err.message, 'error');
-    if (!currentShop) {
-      currentShop = { id: user.uid, ownerUid: user.uid, sellerUid: user.uid, name: user.displayName || 'Local Shop' };
-    }
-    listenToSellerProducts(user.uid);
-    listenToSellerOrders(user.uid, user.uid);
+    showToast('Error checking seller account: ' + err.message, 'error');
+    showOnboardingGate(user);
   } finally {
     const loading = document.getElementById('authConnectingState');
     if (loading) { loading.classList.add('hidden'); loading.style.display = 'none'; }
+  }
+}
+
+function attachShopRealtimeListener(shopId) {
+  if (unsubscribeShopDoc) { unsubscribeShopDoc(); unsubscribeShopDoc = null; }
+  if (!db || isConfigPlaceholder || !shopId) return;
+  unsubscribeShopDoc = onSnapshot(doc(db, 'shops', shopId), (snap) => {
+    if (snap.exists()) {
+      currentShop = { id: snap.id, ...snap.data() };
+      const nameEl = document.getElementById('sellerNameDisplay');
+      if (nameEl) nameEl.textContent = currentShop.name || currentSeller?.displayName || 'Seller';
+      const verEl = document.getElementById('sellerVerifiedBadge');
+      if (verEl) verEl.classList.toggle('hidden', !currentShop.isVerified);
+    }
+  }, (err) => console.warn('[Seller] Shop doc listener:', err));
+}
+
+async function handleCaptureOnboardingGps() {
+  const btn = document.getElementById('btnOnbCaptureGps');
+  const disp = document.getElementById('onbGpsDisplay');
+  if (btn) btn.textContent = '⏳ Capturing GPS…';
+  try {
+    const pos = await getCurrentGpsPosition();
+    onbGpsCoords = { lat: pos.lat, lng: pos.lng };
+    const cityEl = document.getElementById('onbShopCity');
+    const stateEl = document.getElementById('onbShopState');
+    if (cityEl && !cityEl.value && pos.town) cityEl.value = pos.town;
+    if (stateEl && !stateEl.value && pos.region) stateEl.value = pos.region;
+    if (disp) {
+      disp.textContent = `✓ GPS Set: ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}`;
+      disp.style.color = 'var(--emerald-600)';
+    }
+    showToast('Shop GPS coordinates captured!', 'success');
+  } catch (err) {
+    showToast(err.message || 'Could not detect GPS location.', 'warning');
+  } finally {
+    if (btn) btn.textContent = '🛰️ Capture My Shop GPS';
+  }
+}
+
+async function handleCompleteOnboarding(e) {
+  e.preventDefault();
+  if (!currentSeller || !db || isConfigPlaceholder) return;
+
+  const name = document.getElementById('onbShopName')?.value.trim();
+  const rawHandle = document.getElementById('onbShopHandle')?.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+  const category = document.getElementById('onbShopCategory')?.value || 'Grocery';
+  const city = document.getElementById('onbShopCity')?.value.trim();
+  const state = document.getElementById('onbShopState')?.value.trim();
+  const cleanPhone = (document.getElementById('onbShopPhone')?.value.trim() || '').replace(/[^0-9]/g, '');
+  const upiId = document.getElementById('onbShopUpi')?.value.trim();
+  const radius = parseFloat(document.getElementById('onbShopRadius')?.value || '5') || 5;
+  const agreed = document.getElementById('onbAgreeTerms')?.checked;
+
+  if (!name || !rawHandle || !city || !state) {
+    showToast('Please enter Shop Name, Handle, Town/City, and State.', 'warning');
+    return;
+  }
+  if (!cleanPhone || cleanPhone.length < 10) {
+    showToast('Please enter a valid 10-digit seller mobile phone number.', 'warning');
+    return;
+  }
+  if (!agreed) {
+    showToast('Please accept the Seller Compliance & Terms Agreement.', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById('btnCompleteOnboarding');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Activating Seller Studio…'; }
+
+  try {
+    const savedLoc = getSavedUserLocation();
+    const shopId = currentShop?.id || currentSeller.uid;
+    const payload = {
+      ownerUid: currentSeller.uid,
+      sellerUid: currentSeller.uid,
+      ownerEmail: currentSeller.email || '',
+      name,
+      handle: `@${rawHandle}`,
+      category,
+      city,
+      town: city,
+      state,
+      phone: cleanPhone,
+      whatsapp: cleanPhone,
+      upiId: upiId || '',
+      deliveryRadiusKm: radius,
+      perKmRate: 15,
+      description: `Quality ${category.toLowerCase()} & local essentials delivered from ${city}.`,
+      lat: onbGpsCoords?.lat ?? savedLoc?.lat ?? null,
+      lng: onbGpsCoords?.lng ?? savedLoc?.lng ?? null,
+      isAuthorizedSeller: true,
+      agreementsAccepted: true,
+      agreementsTimestamp: serverTimestamp(),
+      isOpen: true,
+      isVerified: currentShop?.isVerified || false,
+      customCategories: currentShop?.customCategories || [],
+      createdAt: currentShop?.createdAt || serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    await setDoc(doc(db, 'shops', shopId), payload, { merge: true });
+    currentShop = { id: shopId, ...payload };
+
+    showToast(`🎉 Welcome, ${name}! Your Authorized Seller Studio is now active.`, 'success');
+    showDashboard(currentSeller);
+    populateShopForm(currentShop);
+    attachShopRealtimeListener(currentShop.id);
+    listenToSellerProducts(currentSeller.uid, currentShop.id);
+    listenToSellerOrders(currentShop.id, currentSeller.uid);
+  } catch (err) {
+    console.error('[Seller] Onboarding failed:', err);
+    showToast('Registration failed: ' + (err.message || err.code), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✓ Become an Authorized Seller & Open Studio'; }
   }
 }
 
@@ -267,6 +410,7 @@ function populateShopForm(shop) {
   setVal('shopName', shop.name || '');
   setVal('shopHandle', shop.handle ? shop.handle.replace(/^@/, '') : '');
   setVal('shopCity', shop.city || shop.town || '');
+  setVal('shopState', shop.state || '');
   setVal('shopPhone', shop.phone || '');
   setVal('productSellerPhone', shop.phone || currentSeller?.phoneNumber || '');
   setVal('shopUpiId', shop.upiId || '');
@@ -400,6 +544,7 @@ async function handleSaveShopProfile(e) {
   const name = document.getElementById('shopName')?.value.trim();
   const rawHandle = document.getElementById('shopHandle')?.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
   const city = document.getElementById('shopCity')?.value.trim();
+  const state = document.getElementById('shopState')?.value.trim();
   const phone = document.getElementById('shopPhone')?.value.trim();
   const upiId = document.getElementById('shopUpiId')?.value.trim();
   const whatsapp = document.getElementById('shopWhatsapp')?.value.trim();
@@ -427,6 +572,7 @@ async function handleSaveShopProfile(e) {
     handle,
     city: city || 'Local Market',
     town: city || 'Local Market',
+    state: state || '',
     phone,
     upiId,
     whatsapp,
@@ -434,6 +580,7 @@ async function handleSaveShopProfile(e) {
     description,
     deliveryRadiusKm: radius,
     perKmRate: perKmRate,
+    isAuthorizedSeller: true,
     agreementsAccepted: true,
     agreementsTimestamp: serverTimestamp(),
     updatedAt: serverTimestamp()
@@ -631,49 +778,61 @@ async function handleUploadProduct(e) {
   }
 }
 
-// ─── Real Products Listener (Dual Parallel Streams: sellerUid + ownerUid) ───────
-function listenToSellerProducts(sellerUid) {
+// ─── Real Products Listener (Parallel Streams: sellerUid + ownerUid + shopId) ──
+let _sellerProdsMap = new Map();
+let _ownerProdsMap = new Map();
+let _shopProdsMap = new Map();
+
+function syncMergedSellerProducts() {
+  const merged = new Map([..._sellerProdsMap, ..._ownerProdsMap, ..._shopProdsMap]);
+  const prods = Array.from(merged.values());
+  prods.sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a));
+  sellerProducts = prods;
+  renderSellerProducts();
+  updateDashboardStats();
+}
+
+function listenToSellerProducts(sellerUid, shopId = null) {
   if (unsubscribeProducts) { unsubscribeProducts(); unsubscribeProducts = null; }
   if (unsubscribeOwnerProds) { unsubscribeOwnerProds(); unsubscribeOwnerProds = null; }
+  if (unsubscribeShopProds) { unsubscribeShopProds(); unsubscribeShopProds = null; }
+  _sellerProdsMap.clear();
+  _ownerProdsMap.clear();
+  _shopProdsMap.clear();
+
   if (!db || isConfigPlaceholder || !sellerUid) return;
 
-  const prodsMap = new Map();
-
-  const handleProdsUpdate = () => {
-    const prods = Array.from(prodsMap.values());
-    prods.sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a));
-    sellerProducts = prods;
-    renderSellerProducts();
-    updateDashboardStats();
-  };
-
-  // Stream 1: Query products where sellerUid == sellerUid
+  // Stream 1: sellerUid == sellerUid
   const qSeller = query(collection(db, 'products'), where('sellerUid', '==', sellerUid));
   unsubscribeProducts = onSnapshot(qSeller, (snapshot) => {
-    snapshot.forEach((d) => {
-      prodsMap.set(d.id, { id: d.id, ...d.data() });
-    });
-    snapshot.docChanges().forEach((change) => {
-      if (change.type === 'removed') prodsMap.delete(change.doc.id);
-    });
-    handleProdsUpdate();
+    _sellerProdsMap.clear();
+    snapshot.forEach((d) => _sellerProdsMap.set(d.id, { id: d.id, ...d.data() }));
+    syncMergedSellerProducts();
   }, (err) => {
     console.warn('[Seller] Products (sellerUid) stream notice:', err);
   });
 
-  // Stream 2: Query products where ownerUid == sellerUid (ensures 100% of owner's products are surfaced)
+  // Stream 2: ownerUid == sellerUid
   const qOwner = query(collection(db, 'products'), where('ownerUid', '==', sellerUid));
   unsubscribeOwnerProds = onSnapshot(qOwner, (snapshot) => {
-    snapshot.forEach((d) => {
-      prodsMap.set(d.id, { id: d.id, ...d.data() });
-    });
-    snapshot.docChanges().forEach((change) => {
-      if (change.type === 'removed') prodsMap.delete(change.doc.id);
-    });
-    handleProdsUpdate();
+    _ownerProdsMap.clear();
+    snapshot.forEach((d) => _ownerProdsMap.set(d.id, { id: d.id, ...d.data() }));
+    syncMergedSellerProducts();
   }, (err) => {
     console.warn('[Seller] Products (ownerUid) stream notice:', err);
   });
+
+  // Stream 3: shopId == shopId (if shopId differs from sellerUid)
+  if (shopId && shopId !== sellerUid) {
+    const qShop = query(collection(db, 'products'), where('shopId', '==', shopId));
+    unsubscribeShopProds = onSnapshot(qShop, (snapshot) => {
+      _shopProdsMap.clear();
+      snapshot.forEach((d) => _shopProdsMap.set(d.id, { id: d.id, ...d.data() }));
+      syncMergedSellerProducts();
+    }, (err) => {
+      console.warn('[Seller] Products (shopId) stream notice:', err);
+    });
+  }
 }
 
 function renderSellerProducts() {
@@ -696,7 +855,8 @@ function renderSellerProducts() {
   tbody.innerHTML = sellerProducts.map(p => {
     const cover = (p.images && p.images[0]) || p.imageUrl || 'https://via.placeholder.com/80x60?text=No+Img';
     const age = calculateProductAge(p.createdAt);
-    const inStock = Boolean(p.inStock && p.stock > 0);
+    const stockVal = p.stock != null ? p.stock : (p.stockCount ?? 0);
+    const inStock = Boolean(p.inStock && stockVal > 0);
 
     return `
       <tr>
@@ -712,7 +872,7 @@ function renderSellerProducts() {
         <td><span class="badge" style="background:var(--slate-100);font-size:0.75rem;">${escapeHtml(p.category)}</span></td>
         <td><strong>₹${p.price}</strong> ${p.mrp ? `<span style="font-size:0.72rem;color:var(--slate-400);text-decoration:line-through;">₹${p.mrp}</span>` : ''}</td>
         <td>
-          <span style="font-weight:700;color:${p.stock <= 5 ? 'var(--rose-600)' : 'var(--slate-800)'};">${p.stock}</span>
+          <span style="font-weight:700;color:${stockVal <= 5 ? 'var(--rose-600)' : 'var(--slate-800)'};">${stockVal}</span>
           <span style="font-size:0.72rem;color:var(--slate-400);">(${escapeHtml(p.unit || 'pcs')})</span>
         </td>
         <td>
@@ -723,7 +883,7 @@ function renderSellerProducts() {
         <td style="font-size:0.82rem;font-weight:600;">${p.salesCount || 0} sold</td>
         <td>
           <div style="display:flex;gap:0.35rem;">
-            <button class="btn btn-icon btn-sm" onclick="window.updateStock('${escapeHtml(p.id)}', ${p.stock})" title="Edit Stock">✏️</button>
+            <button class="btn btn-icon btn-sm" onclick="window.updateStock('${escapeHtml(p.id)}', ${stockVal})" title="Edit Stock">✏️</button>
             <button class="btn btn-icon btn-sm btn-danger" onclick="window.deleteProductItem('${escapeHtml(p.id)}')" title="Delete Product">🗑️</button>
           </div>
         </td>
@@ -735,10 +895,13 @@ function renderSellerProducts() {
 window.toggleProductStockState = async function(prodId, currentInStock) {
   if (!db || isConfigPlaceholder) return;
   const newInStock = !currentInStock;
+  const newCount = newInStock ? 10 : 0;
   try {
     await updateDoc(doc(db, 'products', prodId), {
       inStock: newInStock,
-      stock: newInStock ? 10 : 0
+      stock: newCount,
+      stockCount: newCount,
+      updatedAt: serverTimestamp()
     });
     showToast(`Product is now ${newInStock ? 'In Stock' : 'Out of Stock'}.`, 'info');
   } catch (err) {
@@ -756,7 +919,9 @@ window.updateStock = async function(prodId, currentStock) {
   try {
     await updateDoc(doc(db, 'products', prodId), {
       stock: num,
-      inStock: num > 0
+      stockCount: num,
+      inStock: num > 0,
+      updatedAt: serverTimestamp()
     });
     showToast(`Stock updated to ${num}`, 'success');
   } catch (err) {
@@ -765,7 +930,11 @@ window.updateStock = async function(prodId, currentStock) {
 };
 
 window.deleteProductItem = async function(prodId) {
-  if (!auth?.currentUser) {
+  if (auth && typeof auth.authStateReady === 'function') {
+    await auth.authStateReady();
+  }
+  const activeUser = auth?.currentUser || currentSeller;
+  if (!activeUser) {
     showToast('Please sign in with Google to delete products.', 'warning');
     return;
   }
@@ -782,17 +951,17 @@ window.deleteProductItem = async function(prodId) {
 
   try {
     await deleteDoc(doc(db, 'products', prodId));
-    // Immediately remove from local array for instant UI response
-    sellerProducts = sellerProducts.filter(p => p.id !== prodId);
-    renderSellerProducts();
-    updateDashboardStats();
+    _sellerProdsMap.delete(prodId);
+    _ownerProdsMap.delete(prodId);
+    _shopProdsMap.delete(prodId);
+    syncMergedSellerProducts();
     showToast(`✓ Deleted ${title} successfully.`, 'success');
   } catch (err) {
     console.error('[Seller] Delete product failed:', err);
     const errCode = err.code || 'unknown';
     const errMsg = err.message || 'Permission denied or network failure.';
     if (errCode === 'permission-denied') {
-      showToast(`Delete failed: Missing or insufficient permissions (${errCode}). Logged in as: ${auth.currentUser.email || auth.currentUser.uid}. Ensure Firestore rules allow product owners to delete products.`, 'error');
+      showToast(`Delete failed (${errCode}): Ensure latest firestore.rules are published in Firebase Console and you own this product (${activeUser.email || activeUser.uid}).`, 'error', 6500);
     } else {
       showToast(`Delete failed: ${errMsg} (${errCode})`, 'error');
     }

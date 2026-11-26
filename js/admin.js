@@ -18,12 +18,14 @@ let allShops = [];
 let allProducts = [];
 let allOrders = [];
 let allUsers = [];
+let allFeedback = [];
 let currentAdmin = null;
 
 let unsubShops = null;
 let unsubProducts = null;
 let unsubOrders = null;
 let unsubUsers = null;
+let unsubFeedback = null;
 
 // ─── DOM Elements ───────────────────────────────────────────────────────────
 const adminAuthGate      = document.getElementById('adminAuthGate');
@@ -76,7 +78,7 @@ function initAdminAuth() {
   onAuthStateChanged(auth, user => {
     adminAuthResolved = true;
     clearTimeout(adminAuthTimeout);
-    if (user && user.email === PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL) {
+    if (user && user.email?.toLowerCase() === PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL.toLowerCase()) {
       currentAdmin = user;
       grantAdminAccess(user.email);
       try {
@@ -148,6 +150,7 @@ function detachLiveListeners() {
   if (unsubProducts) { unsubProducts(); unsubProducts = null; }
   if (unsubOrders) { unsubOrders(); unsubOrders = null; }
   if (unsubUsers) { unsubUsers(); unsubUsers = null; }
+  if (unsubFeedback) { unsubFeedback(); unsubFeedback = null; }
 }
 
 // ─── Real-Time Live Admin Data Streams ───────────────────────────────────────
@@ -186,6 +189,14 @@ function listenLiveAdminData() {
     snapshot.forEach(d => allUsers.push({ id: d.id, ...d.data() }));
     updateAllViews();
   }, err => console.warn('[Admin] Users stream:', err));
+
+  // 5. Live Feedback
+  unsubFeedback = onSnapshot(collection(db, 'feedback'), snapshot => {
+    allFeedback = [];
+    snapshot.forEach(d => allFeedback.push({ id: d.id, ...d.data() }));
+    allFeedback.sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a));
+    renderFeedbackTable(allFeedback);
+  }, err => console.warn('[Admin] Feedback stream:', err));
 }
 
 function updateAllViews() {
@@ -199,6 +210,7 @@ function updateAllViews() {
     renderShopsTable(allShops);
     renderOrdersTable(allOrders);
     renderUsersTable(allUsers);
+    renderFeedbackTable(allFeedback);
   }
 }
 
@@ -334,7 +346,7 @@ function renderProductsTable(products) {
         </td>
         <td style="font-size:0.82rem;font-weight:700;color:var(--slate-700);">${p.salesCount || 0} sold</td>
         <td>
-          <button class="btn btn-sm btn-danger" onclick="window.adminDeleteProduct('${escapeHtml(p.id)}', '${escapeHtml(p.title)}')" style="font-size:0.75rem;padding:0.25rem 0.55rem;">
+          <button class="btn btn-sm btn-danger" onclick="window.adminDeleteProduct('${escapeHtml(p.id)}')" style="font-size:0.75rem;padding:0.25rem 0.55rem;">
             🗑️ Delete
           </button>
         </td>
@@ -343,11 +355,15 @@ function renderProductsTable(products) {
   }).join('');
 }
 
-window.adminDeleteProduct = async function(productId, title = 'this product') {
-  if (!auth?.currentUser) {
+window.adminDeleteProduct = async function(productId) {
+  if (auth && typeof auth.authStateReady === 'function') await auth.authStateReady();
+  const activeUser = auth?.currentUser || currentAdmin;
+  if (!activeUser) {
     showToast('Admin session required to delete products.', 'warning');
     return;
   }
+  const prod = allProducts.find(p => p.id === productId);
+  const title = prod?.title || 'this product';
   if (!confirm(`Are you sure you want to PERMANENTLY DELETE "${title}" from the platform?\nIt will be removed immediately from storefront and search results.`)) return;
   if (!db || isConfigPlaceholder) return;
 
@@ -408,7 +424,7 @@ function renderShopsTable(shops) {
           <div style="display:flex;gap:0.35rem;flex-wrap:wrap;">
             <a href="${callUrl}" class="btn btn-sm btn-secondary" style="font-size:0.72rem;padding:0.25rem 0.45rem;">📞 Call</a>
             <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-whatsapp" style="font-size:0.72rem;padding:0.25rem 0.45rem;">💬 WA</a>
-            <button class="btn btn-sm btn-danger" onclick="window.adminDeleteShop('${escapeHtml(shop.id)}', '${escapeHtml(shop.name)}')" style="font-size:0.72rem;padding:0.25rem 0.45rem;">🗑️ Del</button>
+            <button class="btn btn-sm btn-danger" onclick="window.adminDeleteShop('${escapeHtml(shop.id)}')" style="font-size:0.72rem;padding:0.25rem 0.45rem;">🗑️ Del</button>
           </div>
         </td>
       </tr>
@@ -427,11 +443,15 @@ window.adminToggleShopStatus = async function(shopId, currentIsOpen) {
   }
 };
 
-window.adminDeleteShop = async function(shopId, shopName = 'this shop') {
-  if (!auth?.currentUser) {
+window.adminDeleteShop = async function(shopId) {
+  if (auth && typeof auth.authStateReady === 'function') await auth.authStateReady();
+  const activeUser = auth?.currentUser || currentAdmin;
+  if (!activeUser) {
     showToast('Admin session required to delete shops.', 'warning');
     return;
   }
+  const shop = allShops.find(s => s.id === shopId);
+  const shopName = shop?.name || 'this shop';
   if (!confirm(`Are you sure you want to PERMANENTLY DELETE shop "${shopName}"?\nThis cannot be undone.`)) return;
   if (!db || isConfigPlaceholder) return;
   try {
@@ -535,6 +555,31 @@ function renderUsersTable(users) {
   `).join('');
 }
 
+// ─── 6. Customer & Seller Feedback Table ─────────────────────────────────────
+function renderFeedbackTable(items) {
+  const tbody = document.getElementById('feedbackTableBody');
+  if (!tbody) return;
+  if (!items || !items.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:1.5rem;color:var(--slate-500);">No feedback submitted yet.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = items.map(f => `
+    <tr>
+      <td style="font-size:0.82rem;">
+        <strong>${escapeHtml(f.name || 'User')}</strong><br/>
+        <span style="font-size:0.72rem;color:var(--slate-500);">${escapeHtml(f.email || '—')}</span>
+      </td>
+      <td style="font-size:0.8rem;">
+        <span class="badge" style="background:var(--slate-100);color:var(--slate-700);">${escapeHtml(f.category || 'General')}</span>
+        ${f.orderId ? `<div style="font-size:0.72rem;color:var(--azure-700);margin-top:0.2rem;">#${escapeHtml(f.orderId)} (${escapeHtml(f.shopName || '')})</div>` : ''}
+      </td>
+      <td style="font-weight:800;color:var(--amber-600);white-space:nowrap;">${'⭐'.repeat(Math.min(5, Math.max(1, Number(f.rating) || 5)))} (${f.rating || 5}/5)</td>
+      <td style="font-size:0.82rem;color:var(--slate-800);max-width:340px;">${escapeHtml(f.message || '')}</td>
+      <td style="font-size:0.74rem;color:var(--slate-400);white-space:nowrap;">${formatDate(f.createdAt)}</td>
+    </tr>
+  `).join('');
+}
+
 // ─── Search / Filter ──────────────────────────────────────────────────────────
 function filterAdminView(query) {
   if (!query) {
@@ -551,6 +596,7 @@ function filterAdminView(query) {
   renderProductsTable(fProds);
   renderOrdersTable(fOrders);
   renderUsersTable(fUsers);
+  renderFeedbackTable(allFeedback);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

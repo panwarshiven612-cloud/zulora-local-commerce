@@ -1,24 +1,23 @@
 /* ==========================================================================
-   Zulora Local — Modals & Drawer Stylesheet (css/modals-drawer.css)
-   3-Bar Left Menu Drawer, Location Selector, Google Auth & Toast Alerts
+   Zulora Local — Modals & Drawers Stylesheet (css/modals-drawer.css)
+   3-Bar Menu Drawer, Tabbed Settings Modal, Toasts & Mobile-Friendly Dialogs
    ========================================================================== */
 
 /* ─── Modal Overlay & Box ────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 23, 42, 0.58);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 0.85rem;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;
-  contain: layout style paint;
 }
 
 .modal-overlay.open {
@@ -28,15 +27,15 @@
 
 .modal-box {
   background: #ffffff;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   width: 100%;
-  max-width: 500px;
-  max-height: 90vh;
+  max-width: 520px;
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transform: translateY(12px) scale(0.98);
+  transform: translateY(10px) scale(0.98);
   transition: transform 0.2s ease;
 }
 
@@ -45,11 +44,13 @@
 }
 
 .modal-header {
-  padding: 0.85rem 1.25rem;
+  padding: 0.9rem 1.25rem;
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  background: #ffffff;
+  flex-shrink: 0;
 }
 
 .modal-header h3 {
@@ -59,9 +60,9 @@
 }
 
 .modal-body {
-  padding: 1.25rem;
+  padding: 1.15rem 1.25rem;
   overflow-y: auto;
-  max-height: calc(90vh - 120px);
+  flex: 1;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -69,11 +70,64 @@
   padding: 0.85rem 1.25rem;
   border-top: 1px solid var(--border-subtle);
   background: var(--slate-50);
+  flex-shrink: 0;
+}
+
+/* ─── Organized Tabbed Settings UI ───────────────────────────────────────── */
+.settings-tabs {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0.65rem 1.25rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--slate-50);
+  flex-shrink: 0;
+}
+
+.settings-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.settings-tab-btn {
+  padding: 0.38rem 0.78rem;
+  border-radius: var(--radius-full);
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--slate-600);
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.settings-tab-btn.active {
+  background: var(--azure-600);
+  color: #ffffff;
+  border-color: var(--azure-600);
+}
+
+.settings-tab-panel {
+  display: none;
+}
+
+.settings-tab-panel.active {
+  display: block;
+}
+
+.settings-card {
+  background: var(--slate-50);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.9rem;
+  margin-bottom: 0.9rem;
 }
 
 /* ─── 3-Bar Left Navigation Drawer ───────────────────────────────────────── */
 .drawer-left {
   left: 0;
+  right: auto;
   transform: translateX(-100%);
   max-width: 320px;
 }
@@ -82,21 +136,20 @@
   transform: translateX(0);
 }
 
+.drawer.hidden {
+  display: none !important;
+}
+
 .menu-user-card {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.85rem;
-  background: var(--slate-50);
-  border: 1px solid var(--border-subtle);
+  background: linear-gradient(135deg, var(--azure-50), #ffffff);
+  border: 1px solid var(--azure-200);
   border-radius: var(--radius-md);
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.1rem;
   cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.menu-user-card:hover {
-  background: var(--azure-50);
 }
 
 .menu-user-avatar {
@@ -114,21 +167,21 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--slate-400);
-  margin: 1.1rem 0 0.4rem;
+  margin: 1rem 0 0.4rem;
   padding: 0 0.4rem;
 }
 
 .menu-nav-list {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.22rem;
 }
 
 .menu-nav-item {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.55rem 0.65rem;
+  padding: 0.58rem 0.65rem;
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   font-weight: 600;
@@ -138,7 +191,7 @@
   text-align: left;
   border: none;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .menu-nav-item:hover {
@@ -153,8 +206,33 @@
   flex-shrink: 0;
 }
 
+/* Notification Drawer Items */
+.notif-item {
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 0.55rem;
+  cursor: pointer;
+  background: #ffffff;
+}
+.notif-item.notif-unread {
+  background: var(--azure-50);
+  border-color: var(--azure-200);
+}
+.notif-msg {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--slate-800);
+}
+.notif-time {
+  font-size: 0.7rem;
+  color: var(--slate-400);
+  margin-top: 0.2rem;
+}
+
 /* ─── Toast Container ────────────────────────────────────────────────────── */
-.toast-container {
+.toast-container,
+#toast-container {
   position: fixed;
   bottom: 1.5rem;
   right: 1.5rem;
@@ -166,11 +244,12 @@
   pointer-events: none;
 }
 
-@media (max-width: 480px) {
-  .toast-container {
-    bottom: 4.5rem;
-    left: 1rem;
-    right: 1rem;
+@media (max-width: 640px) {
+  .toast-container,
+  #toast-container {
+    bottom: 4.8rem;
+    left: 0.85rem;
+    right: 0.85rem;
     max-width: none;
   }
 }
@@ -192,12 +271,12 @@
 }
 
 .toast.toast-success {
-  background: #047857;
+  background: #065f46;
   border-left: 4px solid #34d399;
 }
 
 .toast.toast-warning {
-  background: #b45309;
+  background: #92400e;
   border-left: 4px solid #fde047;
 }
 

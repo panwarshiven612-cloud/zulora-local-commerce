@@ -2,9 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>My Orders & Live Tracker — Zulora Local</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Orders &amp; Live Tracker — Zulora Local</title>
   <meta name="description" content="Track your Zulora Local hyperlocal orders in real time with Blinkit-style 4-step progress, direct seller call and WhatsApp, and 1-tap reorder." />
+  <meta property="og:title" content="My Orders &amp; Live Tracker — Zulora Local" />
+  <meta property="og:description" content="Real-time order tracking, merchant contact, and delivery confirmation on Zulora Local." />
+  <meta property="og:type" content="website" />
   <meta name="theme-color" content="#0284C7" />
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" type="image/jpeg" />
@@ -56,6 +59,14 @@
     <div id="ordersListContainer"></div>
 
   </main>
+
+  <!-- Mobile Bottom Nav -->
+  <nav class="mobile-bottom-nav" aria-label="Mobile Quick Navigation">
+    <a href="./index.html" class="mobile-nav-tab"><span class="icon">🏠</span><span>Store</span></a>
+    <a href="./orders.html" class="mobile-nav-tab active"><span class="icon">📦</span><span>Orders</span></a>
+    <a href="./seller.html" class="mobile-nav-tab"><span class="icon">🏪</span><span>Sell</span></a>
+    <a href="./index.html#mainContent" class="mobile-nav-tab"><span class="icon">🛍️</span><span>Shop</span></a>
+  </nav>
 
   <!-- ═══════════════ FOOTER ═══════════════ -->
   <footer class="site-footer">

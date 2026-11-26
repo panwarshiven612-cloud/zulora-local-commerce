@@ -1,16 +1,17 @@
 /**
- * Zulora Local — Main Storefront Application Engine v3
- * Modular, lag-free, Blinkit-inspired quick commerce orchestrator.
- * Open browsing, strict Google Auth gate for orders, smart multi-shop cart.
+ * Zulora Local — Main Storefront Application Engine v4
+ * Zomato/Blinkit-grade modular quick commerce orchestrator.
+ * Location-first discovery, Checkout auto-fill, Dynamic UPI QR,
+ * Authorized Seller registration in Settings, and live Firestore sync.
  */
 
 import {
-  db, collection, doc, getDoc, getDocs, addDoc, updateDoc,
-  query, orderBy, onSnapshot, serverTimestamp, increment, isConfigPlaceholder
+  db, collection, doc, getDoc, setDoc, addDoc, updateDoc,
+  onSnapshot, serverTimestamp, increment, isConfigPlaceholder
 } from './firebase-init.js';
 
 import {
-  initAuth, signInWithGoogle, signOutUser, getCurrentUser
+  initAuth, signInWithGoogle, signOutUser
 } from './auth.js';
 
 import {
@@ -20,7 +21,8 @@ import {
 } from './cart.js';
 
 import {
-  saveUserLocation, getSavedUserLocation
+  getCurrentGpsPosition, saveUserLocation, getSavedUserLocation,
+  saveUserProfile, getSavedUserProfile
 } from './geo-pricing.js';
 
 import { PLATFORM_CONSTANTS } from './config.js';
@@ -36,16 +38,19 @@ import {
   renderStorefrontProducts, updateCardStepperDOM,
   renderLiveSuggestions, showLoadingSkeleton
 } from './storefront.js';
+import { buildUpiUri, renderQrSvgHtml } from './upi-qr.js';
 
 // ─── Application State ────────────────────────────────────────────────────────
 let currentUser = null;
 let userLocation = getSavedUserLocation();
+let userProfile = getSavedUserProfile();
 let allProducts = [];
 let allShops = new Map();
 let selectedCategory = 'All';
 let searchQuery = '';
 let nearbyFilterActive = false;
 let pendingCheckoutAfterAuth = false;
+let regShopCoords = null;
 
 // ─── Boot Lifecycle ───────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -63,31 +68,18 @@ function setupEventListeners() {
   // Navigation & 3-Bar Hamburger Drawer
   document.getElementById('btnHamburgerMenu')?.addEventListener('click', openMenuDrawer);
   document.getElementById('btnCloseMenuDrawer')?.addEventListener('click', closeMenuDrawer);
-  document.getElementById('topLocationPill')?.addEventListener('click', () => {
-    openLocationSetupModal({
-      currentLocation: userLocation,
-      currentUser,
-      db,
-      isConfigPlaceholder,
-      onLocationSaved: handleLocationSaved
-    });
-  });
+  document.getElementById('topLocationPill')?.addEventListener('click', triggerLocationModal);
   document.getElementById('navCartBtn')?.addEventListener('click', openCart);
+  document.getElementById('mobileTabSettings')?.addEventListener('click', () => openSettingsModal('profile'));
 
   // Drawer Menu Navigation Links
   document.getElementById('menuItemLocation')?.addEventListener('click', () => {
     closeMenuDrawer();
-    openLocationSetupModal({
-      currentLocation: userLocation,
-      currentUser,
-      db,
-      isConfigPlaceholder,
-      onLocationSaved: handleLocationSaved
-    });
+    triggerLocationModal();
   });
   document.getElementById('menuItemSettings')?.addEventListener('click', () => {
     closeMenuDrawer();
-    openSettingsModal();
+    openSettingsModal('profile');
   });
   document.getElementById('menuItemAbout')?.addEventListener('click', () => {
     closeMenuDrawer();
@@ -115,6 +107,7 @@ function setupEventListeners() {
     closeSignInModal();
     await handleSignInAction();
   });
+
   // Account Modal & Safe Sign-Out
   document.getElementById('btnUserAccount')?.addEventListener('click', openAccountModal);
   document.getElementById('btnCloseAccountModal')?.addEventListener('click', closeAccountModal);
@@ -124,13 +117,7 @@ function setupEventListeners() {
   });
   document.getElementById('btnAccountChangeLocation')?.addEventListener('click', () => {
     closeAccountModal();
-    openLocationSetupModal({
-      currentLocation: userLocation,
-      currentUser,
-      db,
-      isConfigPlaceholder,
-      onLocationSaved: handleLocationSaved
-    });
+    triggerLocationModal();
   });
   document.getElementById('userAccountModal')?.addEventListener('click', (e) => {
     if (e.target.id === 'userAccountModal') closeAccountModal();
@@ -141,67 +128,14 @@ function setupEventListeners() {
   document.getElementById('btnAgreeTerms')?.addEventListener('click', closeTermsModal);
   document.getElementById('btnClosePolicyModal')?.addEventListener('click', closePolicyModal);
   document.getElementById('btnAgreePolicy')?.addEventListener('click', closePolicyModal);
-  document.getElementById('btnCloseSettingsModal')?.addEventListener('click', closeSettingsModal);
-  document.getElementById('btnSettingsSignOut')?.addEventListener('click', async () => {
-    closeSettingsModal();
-    await handleSignOutAction();
-  });
-  document.getElementById('btnSettingsChangeLocation')?.addEventListener('click', () => {
-    closeSettingsModal();
-    openLocationSetupModal({
-      currentLocation: userLocation,
-      currentUser,
-      db,
-      isConfigPlaceholder,
-      onLocationSaved: handleLocationSaved
-    });
-  });
-  document.getElementById('btnSettingsEnablePush')?.addEventListener('click', async () => {
-    if (!('Notification' in window)) {
-      showToast('Notifications are not supported in this browser.', 'warning');
-      return;
-    }
-    const perm = await Notification.requestPermission();
-    if (perm === 'granted') {
-      showToast('🔔 Push notifications enabled!', 'success');
-    } else {
-      showToast('Notification permission was not granted.', 'info');
-    }
-  });
-
-  // Notification preference toggles
-  ['prefOrderNotifs', 'prefCartReminders', 'prefLocalDeals'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', () => {
-      const prefs = {
-        orders: document.getElementById('prefOrderNotifs')?.checked ?? true,
-        cart: document.getElementById('prefCartReminders')?.checked ?? true,
-        deals: document.getElementById('prefLocalDeals')?.checked ?? true
-      };
-      try { localStorage.setItem('zulora_notif_prefs', JSON.stringify(prefs)); } catch (_) {}
-      showToast('Notification preferences saved.', 'info');
-    });
-  });
   document.getElementById('btnCloseAboutUsModal')?.addEventListener('click', closeAboutModal);
 
+  // Expanded Settings Modal
+  setupSettingsModalListeners();
+
   // Location Controls in Banner
-  document.getElementById('btnDetectGps')?.addEventListener('click', async () => {
-    openLocationSetupModal({
-      currentLocation: userLocation,
-      currentUser,
-      db,
-      isConfigPlaceholder,
-      onLocationSaved: handleLocationSaved
-    });
-  });
-  document.getElementById('btnManualLocation')?.addEventListener('click', () => {
-    openLocationSetupModal({
-      currentLocation: userLocation,
-      currentUser,
-      db,
-      isConfigPlaceholder,
-      onLocationSaved: handleLocationSaved
-    });
-  });
+  document.getElementById('btnDetectGps')?.addEventListener('click', triggerLocationModal);
+  document.getElementById('btnManualLocation')?.addEventListener('click', triggerLocationModal);
 
   // Debounced Search Input & Live Suggestions
   const searchInput = document.getElementById('searchInput');
@@ -219,10 +153,9 @@ function setupEventListeners() {
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => {
       refreshProductGrid();
-    }, 120);
+    }, 100);
   });
 
-  // Close suggestions when clicking outside
   document.addEventListener('click', e => {
     if (!e.target.closest('.search-hero')) {
       suggestionsBox?.classList.remove('show');
@@ -238,15 +171,9 @@ function setupEventListeners() {
   });
 
   document.getElementById('filterNearbyBtn')?.addEventListener('click', () => {
-    if (!userLocation || userLocation.lat == null) {
-      showToast('Please set your location first to filter nearby items.', 'warning');
-      openLocationSetupModal({
-        currentLocation: userLocation,
-        currentUser,
-        db,
-        isConfigPlaceholder,
-        onLocationSaved: handleLocationSaved
-      });
+    if (!userLocation || (userLocation.lat == null && (!userLocation.town || userLocation.town === 'All Locations'))) {
+      showToast('Set your City/Town or GPS first to filter nearby stores.', 'warning');
+      triggerLocationModal();
       return;
     }
     nearbyFilterActive = true;
@@ -287,7 +214,7 @@ function setupEventListeners() {
   // Data Refresh
   document.getElementById('btnRefreshData')?.addEventListener('click', () => {
     loadPlatformData();
-    showToast('Refreshing products…', 'info');
+    showToast('Refreshing live storefront…', 'info');
   });
 
   // Notifications Drawer
@@ -297,6 +224,283 @@ function setupEventListeners() {
     markAllRead();
     renderNotificationDrawer();
   });
+}
+
+function triggerLocationModal() {
+  openLocationSetupModal({
+    currentLocation: userLocation,
+    currentUser,
+    db,
+    isConfigPlaceholder,
+    onLocationSaved: handleLocationSaved
+  });
+}
+
+// ─── Settings Modal Tabs, Profile, Authorized Seller & Feedback ───────────────
+function setupSettingsModalListeners() {
+  document.getElementById('btnCloseSettingsModal')?.addEventListener('click', closeSettingsModal);
+  document.getElementById('btnSettingsSignOut')?.addEventListener('click', async () => {
+    closeSettingsModal();
+    await handleSignOutAction();
+  });
+  document.getElementById('btnSettingsChangeLocation')?.addEventListener('click', () => {
+    closeSettingsModal();
+    triggerLocationModal();
+  });
+
+  // Tab switching
+  document.querySelectorAll('#settingsTabs .settings-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      switchSettingsTab(btn.dataset.tab || 'profile');
+    });
+  });
+
+  // Save Profile & Address
+  document.getElementById('btnSettingsSaveProfile')?.addEventListener('click', async () => {
+    const name = document.getElementById('setProfileName')?.value.trim() || '';
+    const phone = document.getElementById('setProfilePhone')?.value.trim() || '';
+    const town = document.getElementById('setProfileTown')?.value.trim() || '';
+    const state = document.getElementById('setProfileState')?.value.trim() || '';
+    const street = document.getElementById('setProfileStreet')?.value.trim() || '';
+
+    userProfile = { ...userProfile, name, phone };
+    saveUserProfile(userProfile);
+
+    if (town || street || phone || state) {
+      const address = `${street ? street + ', ' : ''}${town}${state ? ', ' + state : ''}`;
+      userLocation = {
+        ...(userLocation || {}),
+        town: town || userLocation?.town || '',
+        region: state || userLocation?.region || '',
+        street: street || userLocation?.street || '',
+        phone: phone || userLocation?.phone || '',
+        address: address || userLocation?.address || ''
+      };
+      saveUserLocation(userLocation);
+      updateLocationUI();
+      refreshProductGrid();
+    }
+
+    if (currentUser && db && !isConfigPlaceholder) {
+      try {
+        await setDoc(doc(db, 'users', currentUser.uid), {
+          uid: currentUser.uid,
+          displayName: name || currentUser.displayName || '',
+          phone,
+          location: userLocation,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (err) {
+        console.warn('[Settings] Firestore profile sync:', err);
+      }
+    }
+    showToast('✓ Profile & delivery address saved! Checkout will auto-fill.', 'success');
+  });
+
+  // Become an Authorized Seller: Sign in CTA
+  document.getElementById('btnSettingsSellerSignIn')?.addEventListener('click', async () => {
+    await signInWithGoogle();
+    refreshSettingsSellerState();
+  });
+
+  // Become an Authorized Seller: GPS Capture
+  document.getElementById('btnRegShopGps')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btnRegShopGps');
+    const disp = document.getElementById('regShopGpsStatus');
+    if (btn) btn.textContent = '⏳ Detecting…';
+    try {
+      const pos = await getCurrentGpsPosition();
+      regShopCoords = { lat: pos.lat, lng: pos.lng };
+      const cityEl = document.getElementById('regShopCity');
+      const stateEl = document.getElementById('regShopState');
+      if (cityEl && !cityEl.value && pos.town) cityEl.value = pos.town;
+      if (stateEl && !stateEl.value && pos.region) stateEl.value = pos.region;
+      if (disp) {
+        disp.textContent = `✓ GPS Set (${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)})`;
+        disp.style.color = 'var(--emerald-600)';
+      }
+    } catch (err) {
+      showToast(err.message || 'GPS unavailable. You can still register manually.', 'warning');
+    } finally {
+      if (btn) btn.textContent = '🛰️ Capture Shop GPS';
+    }
+  });
+
+  // Become an Authorized Seller: Form Submit
+  document.getElementById('settingsBecomeSellerForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!currentUser) {
+      showToast('Please sign in with Google first to become an Authorized Seller.', 'warning');
+      return;
+    }
+    if (!db || isConfigPlaceholder) return;
+
+    const name = document.getElementById('regShopName')?.value.trim();
+    const rawHandle = document.getElementById('regShopHandle')?.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    const city = document.getElementById('regShopCity')?.value.trim();
+    const state = document.getElementById('regShopState')?.value.trim();
+    const phone = document.getElementById('regShopPhone')?.value.trim().replace(/[^0-9]/g, '');
+    const upiId = document.getElementById('regShopUpi')?.value.trim();
+    const radius = parseFloat(document.getElementById('regShopRadius')?.value || '5') || 5;
+    const category = document.getElementById('regShopCategory')?.value || 'Grocery';
+    const agreed = document.getElementById('regShopAgree')?.checked;
+
+    if (!name || !rawHandle || !city || !state) {
+      showToast('Please fill Shop Name, Handle, Town/City, and State.', 'warning');
+      return;
+    }
+    if (!phone || phone.length < 10) {
+      showToast('Please enter a valid 10-digit phone/WhatsApp number.', 'warning');
+      return;
+    }
+    if (!agreed) {
+      showToast('Please accept the Seller Compliance & Terms Agreement.', 'warning');
+      return;
+    }
+
+    const submitBtn = document.getElementById('btnSubmitAuthorizedSeller');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '⏳ Registering Store…'; }
+
+    try {
+      const shopPayload = {
+        ownerUid: currentUser.uid,
+        sellerUid: currentUser.uid,
+        ownerEmail: currentUser.email || '',
+        name,
+        handle: `@${rawHandle}`,
+        city,
+        town: city,
+        state,
+        phone,
+        whatsapp: phone,
+        upiId: upiId || '',
+        category,
+        deliveryRadiusKm: radius,
+        perKmRate: 15,
+        lat: regShopCoords?.lat ?? userLocation?.lat ?? null,
+        lng: regShopCoords?.lng ?? userLocation?.lng ?? null,
+        isAuthorizedSeller: true,
+        agreementsAccepted: true,
+        agreementsTimestamp: serverTimestamp(),
+        isOpen: true,
+        isVerified: false,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      await setDoc(doc(db, 'shops', currentUser.uid), shopPayload, { merge: true });
+      allShops.set(currentUser.uid, { id: currentUser.uid, ...shopPayload });
+      showToast(`🎉 "${name}" is now registered as an Authorized Seller!`, 'success');
+      refreshSettingsSellerState();
+    } catch (err) {
+      console.error('[Settings] Seller registration failed:', err);
+      showToast('Registration failed: ' + (err.message || err.code), 'error');
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '✓ Register as Authorized Seller'; }
+    }
+  });
+
+  // Order & Notification Preferences
+  document.getElementById('btnSettingsEnablePush')?.addEventListener('click', async () => {
+    if (!('Notification' in window)) {
+      showToast('Notifications are not supported in this browser.', 'warning');
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    showToast(perm === 'granted' ? '🔔 Push notifications enabled!' : 'Notification permission was not granted.', perm === 'granted' ? 'success' : 'info');
+  });
+
+  ['prefOrderNotifs', 'prefCartReminders', 'prefLocalDeals', 'prefAutoFillCheckout', 'prefDefaultPayment'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      const prefs = {
+        orders: document.getElementById('prefOrderNotifs')?.checked ?? true,
+        cart: document.getElementById('prefCartReminders')?.checked ?? true,
+        deals: document.getElementById('prefLocalDeals')?.checked ?? true,
+        autoFill: document.getElementById('prefAutoFillCheckout')?.checked ?? true,
+        defaultPayment: document.getElementById('prefDefaultPayment')?.value || 'UPI'
+      };
+      try { localStorage.setItem('zulora_notif_prefs', JSON.stringify(prefs)); } catch (_) {}
+      showToast('Preferences saved.', 'info');
+    });
+  });
+
+  // Customer / Seller Feedback submission
+  document.getElementById('settingsFeedbackForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const rating = parseInt(document.getElementById('fbRating')?.value || '5', 10);
+    const category = document.getElementById('fbCategory')?.value || 'Buyer Experience';
+    const message = document.getElementById('fbMessage')?.value.trim();
+    if (!message) return;
+
+    if (db && !isConfigPlaceholder) {
+      try {
+        await addDoc(collection(db, 'feedback'), {
+          uid: currentUser?.uid || 'guest',
+          email: currentUser?.email || '',
+          name: currentUser?.displayName || userProfile?.name || 'Zulora User',
+          rating,
+          category,
+          message,
+          createdAt: serverTimestamp()
+        });
+        document.getElementById('fbMessage').value = '';
+        showToast('🙏 Thank you! Your feedback has been sent to Zulora AI.', 'success');
+      } catch (err) {
+        showToast('Could not submit feedback: ' + err.message, 'error');
+      }
+    } else {
+      showToast('🙏 Thank you for your feedback!', 'success');
+      document.getElementById('fbMessage').value = '';
+    }
+  });
+}
+
+function switchSettingsTab(tabName) {
+  document.querySelectorAll('#settingsTabs .settings-tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabName);
+  });
+  document.querySelectorAll('#settingsModal .settings-tab-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.dataset.panel === tabName);
+  });
+}
+
+function refreshSettingsSellerState() {
+  const gate = document.getElementById('settingsSellerGatePrompt');
+  const activeBox = document.getElementById('settingsSellerActiveBox');
+  const regForm = document.getElementById('settingsBecomeSellerForm');
+
+  if (!currentUser) {
+    gate?.classList.remove('hidden');
+    activeBox?.classList.add('hidden');
+    regForm?.classList.add('hidden');
+    return;
+  }
+
+  gate?.classList.add('hidden');
+  const shop = allShops.get(currentUser.uid) || Array.from(allShops.values()).find(s => s.ownerUid === currentUser.uid || s.sellerUid === currentUser.uid);
+  const isAuthorized = Boolean(shop && (shop.isAuthorizedSeller || shop.agreementsAccepted || (shop.phone && shop.name)));
+
+  if (isAuthorized) {
+    activeBox?.classList.remove('hidden');
+    regForm?.classList.add('hidden');
+    const handleDisp = document.getElementById('settingsSellerHandleDisp');
+    const summaryEl = document.getElementById('settingsSellerShopSummary');
+    const verBadge = document.getElementById('settingsSellerVerifiedBadge');
+    if (handleDisp) handleDisp.textContent = shop.handle || '';
+    if (verBadge) verBadge.classList.toggle('hidden', !shop.isVerified);
+    if (summaryEl) {
+      summaryEl.textContent = `${shop.name} • ${shop.city || shop.town || 'Area set'} (${shop.deliveryRadiusKm || 5} km radius) • Phone: ${shop.phone || '—'}`;
+    }
+  } else {
+    activeBox?.classList.add('hidden');
+    regForm?.classList.remove('hidden');
+    const cityEl = document.getElementById('regShopCity');
+    const stateEl = document.getElementById('regShopState');
+    const phoneEl = document.getElementById('regShopPhone');
+    if (cityEl && !cityEl.value && userLocation?.town && userLocation.town !== 'All Locations') cityEl.value = userLocation.town;
+    if (stateEl && !stateEl.value && userLocation?.region) stateEl.value = userLocation.region;
+    if (phoneEl && !phoneEl.value) phoneEl.value = userProfile?.phone || userLocation?.phone || '';
+  }
 }
 
 // ─── 3-Bar Left Menu Drawer Controls ──────────────────────────────────────────
@@ -345,23 +549,40 @@ function closePolicyModal() {
 }
 window.openPolicyModal = openPolicyModal;
 
-function openSettingsModal() {
+function openSettingsModal(initialTab = 'profile') {
   const locDesc = document.getElementById('settingsLocationDesc');
   if (locDesc) {
-    locDesc.textContent = (userLocation && userLocation.town) ? `Current: ${userLocation.town}` : 'Current: All Locations';
+    locDesc.textContent = (userLocation && userLocation.town && userLocation.town !== 'All Locations')
+      ? `Current: ${userLocation.address || userLocation.town}`
+      : 'Current: Not set yet (click Set / Detect GPS)';
   }
+
+  // Pre-fill profile fields
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+  setVal('setProfileName', userProfile?.name || currentUser?.displayName || '');
+  setVal('setProfilePhone', userProfile?.phone || userLocation?.phone || '');
+  setVal('setProfileTown', (userLocation?.town && userLocation.town !== 'All Locations') ? userLocation.town : '');
+  setVal('setProfileState', userLocation?.region || '');
+  setVal('setProfileStreet', userLocation?.street || '');
+
   try {
     const raw = localStorage.getItem('zulora_notif_prefs');
-    const prefs = raw ? JSON.parse(raw) : { orders: true, cart: true, deals: true };
-    const elOrders = document.getElementById('prefOrderNotifs');
-    const elCart = document.getElementById('prefCartReminders');
-    const elDeals = document.getElementById('prefLocalDeals');
-    if (elOrders) elOrders.checked = prefs.orders !== false;
-    if (elCart) elCart.checked = prefs.cart !== false;
-    if (elDeals) elDeals.checked = prefs.deals !== false;
+    const prefs = raw ? JSON.parse(raw) : { orders: true, cart: true, deals: true, autoFill: true, defaultPayment: 'UPI' };
+    const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = val; };
+    setChk('prefOrderNotifs', prefs.orders !== false);
+    setChk('prefCartReminders', prefs.cart !== false);
+    setChk('prefLocalDeals', prefs.deals !== false);
+    setChk('prefAutoFillCheckout', prefs.autoFill !== false);
+    const payEl = document.getElementById('prefDefaultPayment');
+    if (payEl) payEl.value = prefs.defaultPayment || 'UPI';
   } catch (_) {}
+
+  refreshSettingsSellerState();
+  switchSettingsTab(initialTab);
   document.getElementById('settingsModal')?.classList.add('open');
 }
+window.openSettingsModal = openSettingsModal;
+
 function closeSettingsModal() {
   document.getElementById('settingsModal')?.classList.remove('open');
 }
@@ -376,6 +597,10 @@ function closeAboutModal() {
 // ─── Location & Auth Synchronization ──────────────────────────────────────────
 function handleLocationSaved(newLoc) {
   userLocation = newLoc;
+  if (newLoc?.phone) {
+    userProfile = { ...userProfile, phone: newLoc.phone };
+    saveUserProfile(userProfile);
+  }
   updateLocationUI();
   refreshProductGrid();
 }
@@ -383,13 +608,24 @@ function handleLocationSaved(newLoc) {
 function updateLocationUI() {
   const el = document.getElementById('locationTownText');
   const topEl = document.getElementById('topLocationText');
+  const banner = document.getElementById('locationBanner');
 
-  const displayText = (userLocation && userLocation.town && userLocation.town !== 'All Locations')
-    ? (userLocation.region ? `${userLocation.town}, ${userLocation.region}` : userLocation.town)
-    : ((userLocation && userLocation.lat != null) ? `${userLocation.lat.toFixed(3)}, ${userLocation.lng.toFixed(3)}` : 'Set Location');
+  const hasLoc = Boolean(userLocation && ((userLocation.town && userLocation.town !== 'All Locations') || userLocation.lat != null));
+  const displayText = hasLoc
+    ? (userLocation.town && userLocation.town !== 'All Locations'
+        ? (userLocation.region ? `${userLocation.town}, ${userLocation.region}` : userLocation.town)
+        : `${userLocation.lat.toFixed(3)}, ${userLocation.lng.toFixed(3)}`)
+    : 'Set Area';
 
   if (topEl) topEl.textContent = displayText;
-  if (el) el.textContent = displayText === 'Set Location' ? 'All Locations (Worldwide)' : displayText;
+  if (el) {
+    el.textContent = hasLoc
+      ? (userLocation.street ? `${userLocation.street}, ${displayText}` : displayText)
+      : 'Set your City / Town / Village to see km distance & nearby stores';
+  }
+  if (banner) {
+    banner.classList.toggle('needs-location', !hasLoc);
+  }
 }
 
 async function handleSignInAction() {
@@ -397,6 +633,15 @@ async function handleSignInAction() {
   if (user && pendingCheckoutAfterAuth) {
     pendingCheckoutAfterAuth = false;
     openCheckoutModal();
+    return;
+  }
+  // If signed-in user hasn't set location yet, invite them cleanly
+  if (user && (!userLocation || (!userLocation.town && userLocation.lat == null))) {
+    setTimeout(() => {
+      if (!userLocation || (!userLocation.town && userLocation.lat == null)) {
+        triggerLocationModal();
+      }
+    }, 600);
   }
 }
 
@@ -419,6 +664,14 @@ async function handleUserAuthChange(user) {
 
       if (snap.exists()) {
         const data = snap.data();
+        if (data.displayName || data.phone) {
+          userProfile = {
+            ...userProfile,
+            name: data.displayName || userProfile?.name || user.displayName || '',
+            phone: data.phone || userProfile?.phone || ''
+          };
+          saveUserProfile(userProfile);
+        }
         if (data.location && (data.location.town || data.location.lat != null)) {
           userLocation = data.location;
           saveUserLocation(userLocation);
@@ -470,7 +723,7 @@ function updateAuthUI(user) {
     if (drawerUserName) drawerUserName.textContent = user.displayName || 'Signed-In Shopper';
     if (drawerUserEmail) drawerUserEmail.textContent = user.email || 'Google Account Active';
 
-    const isSupremeAdmin = user.email === PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL;
+    const isSupremeAdmin = user.email?.toLowerCase() === PLATFORM_CONSTANTS.SUPREME_ADMIN_EMAIL.toLowerCase();
     if (navAdmin) navAdmin.classList.toggle('hidden', !isSupremeAdmin);
     if (drawerAdminLink) drawerAdminLink.classList.toggle('hidden', !isSupremeAdmin);
   } else {
@@ -507,7 +760,6 @@ function loadPlatformData() {
     return;
   }
 
-  // 1. Real-time shops listener (syncs shop updates and verification blue ticks live!)
   if (unsubShops) unsubShops();
   try {
     unsubShops = onSnapshot(collection(db, 'shops'), snapshot => {
@@ -523,7 +775,6 @@ function loadPlatformData() {
     console.warn('[Firestore] Shops listener setup:', err);
   }
 
-  // 2. Real-time products listener (syncs additions, edits, and deletions live!)
   if (unsubProducts) unsubProducts();
   try {
     unsubProducts = onSnapshot(collection(db, 'products'), snapshot => {
@@ -535,7 +786,6 @@ function loadPlatformData() {
         }
       });
 
-      // Sort client-side by createdAt descending (no composite index required)
       rawProds.sort((a, b) => {
         const tA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAtIso ? new Date(a.createdAtIso).getTime() : 0);
         const tB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAtIso ? new Date(b.createdAtIso).getTime() : 0);
@@ -543,8 +793,6 @@ function loadPlatformData() {
       });
 
       allProducts = rawProds;
-
-      // Cleanse cart: immediately purge any deleted products from user's active cart
       loadCartFromStorage(allProducts);
       updateCartUI();
       refreshProductGrid();
@@ -554,6 +802,20 @@ function loadPlatformData() {
   } catch (err) {
     console.warn('[Firestore] Products listener setup:', err);
   }
+}
+
+function resetAllFilters() {
+  searchQuery = '';
+  selectedCategory = 'All';
+  nearbyFilterActive = false;
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) searchInput.value = '';
+  document.querySelectorAll('.category-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.category === 'All');
+  });
+  document.getElementById('filterAllBtn')?.classList.add('active');
+  document.getElementById('filterNearbyBtn')?.classList.remove('active');
+  refreshProductGrid();
 }
 
 function refreshProductGrid() {
@@ -568,7 +830,8 @@ function refreshProductGrid() {
     cart: getCart(),
     selectedCategory,
     searchQuery,
-    nearbyFilterActive
+    nearbyFilterActive,
+    onResetFilters: resetAllFilters
   });
 }
 
@@ -671,6 +934,11 @@ function renderCartDrawerContent() {
     totalGrand += group.grandTotal;
     if (group.isBelowMinOrder) hasAnyShortfall = true;
 
+    const shopCity = group.shop.city || group.shop.town || '';
+    const distBadgeText = group.distKm != null
+      ? `📍 ${group.distKm.toFixed(1)} km away`
+      : (shopCity ? `📍 ${escapeHtml(shopCity)}` : '📍 Set GPS for km');
+
     const rows = group.items.map(item => {
       const coverImg = Array.isArray(item.product.images) && item.product.images.length > 0
         ? item.product.images[0]
@@ -700,11 +968,11 @@ function renderCartDrawerContent() {
       <div class="shop-cart-card">
         <div class="shop-cart-header">
           <div>
-            <strong style="font-size:0.88rem;color:var(--slate-900);">${escapeHtml(group.shop.name || 'Local Seller')}</strong>
+            <strong style="font-size:0.88rem;color:var(--slate-900);">${escapeHtml(group.shop.name || 'Neighbourhood Seller')}</strong>
             <span style="display:block;font-size:0.7rem;color:var(--slate-400);">Self-Delivery by merchant</span>
           </div>
           <span style="font-size:0.74rem;font-weight:700;color:var(--azure-700);background:var(--azure-50);padding:0.2rem 0.5rem;border-radius:var(--radius-sm);">
-            ${group.distKm ? `📍 ${group.distKm.toFixed(1)} km` : '📍 Local'}
+            ${distBadgeText}
           </span>
         </div>
 
@@ -716,7 +984,7 @@ function renderCartDrawerContent() {
             <span>₹${group.shopTotal.toFixed(2)}</span>
           </div>
           <div class="shop-bill-row">
-            <span>Distance Delivery Fee (${group.distKm ? group.distKm.toFixed(1) : 1} km @ ₹15/km)</span>
+            <span>Distance Fee (${group.distKm ? group.distKm.toFixed(1) : 1} km @ ₹${group.perKmRate || 15}/km)</span>
             <span>₹${(group.baseFee || 15).toFixed(2)}</span>
           </div>
           <div class="shop-bill-row">
@@ -750,7 +1018,7 @@ function renderCartDrawerContent() {
         ⚠️ One or more stores do not meet the ₹50 minimum order threshold.
       </div>
     ` : ''}
-    <button class="btn btn-primary btn-block" onclick="window.handleCheckoutClick()" ${hasAnyShortfall ? 'disabled style="opacity:0.6;cursor:not-allowed;"' : ''} style="padding:0.75rem;font-size:0.95rem;font-weight:800;border-radius:var(--radius-full);background:var(--emerald-600);border-color:var(--emerald-600);">
+    <button class="btn btn-success btn-block" onclick="window.handleCheckoutClick()" ${hasAnyShortfall ? 'disabled style="opacity:0.6;cursor:not-allowed;"' : ''} style="padding:0.75rem;font-size:0.95rem;font-weight:800;border-radius:var(--radius-full);">
       Proceed to Checkout →
     </button>
   `;
@@ -768,7 +1036,7 @@ window.handleCheckoutClick = function() {
   openCheckoutModal();
 };
 
-// ─── Checkout & Order Placement ───────────────────────────────────────────────
+// ─── Checkout & Order Placement (Auto-Fill + Dynamic UPI QR) ──────────────────
 window.openCheckoutModal = function() {
   if (!currentUser) {
     pendingCheckoutAfterAuth = true;
@@ -787,52 +1055,90 @@ window.openCheckoutModal = function() {
 
   const grandTotal = Object.values(groups).reduce((sum, g) => sum + g.grandTotal, 0);
 
+  let savedPrefs = { autoFill: true, defaultPayment: 'UPI' };
+  try {
+    const raw = localStorage.getItem('zulora_notif_prefs');
+    if (raw) savedPrefs = { ...savedPrefs, ...JSON.parse(raw) };
+  } catch (_) {}
+
+  const autoFill = savedPrefs.autoFill !== false;
+  const defaultPayment = savedPrefs.defaultPayment || 'UPI';
+
+  const preName = autoFill ? (userProfile?.name || currentUser?.displayName || '') : '';
+  const prePhone = autoFill ? (userProfile?.phone || userLocation?.phone || currentUser?.phoneNumber || '') : '';
+  const preCity = autoFill ? ((userLocation?.town && userLocation.town !== 'All Locations') ? userLocation.town : '') : '';
+  const preState = autoFill ? (userLocation?.region || userLocation?.state || '') : '';
+  const preStreet = autoFill ? (userLocation?.street || '') : '';
+
   const qrSections = Object.entries(groups).map(([shopId, group]) => {
     const shop = group.shop;
     const shopTotal = group.grandTotal;
-    const upiId = shop.upiId || '';
+    const upiId = (shop.upiId || '').trim();
     const hasCustomQr = Boolean(shop.upiQrImageUrl);
     const cleanPhone = (shop.phone || '').replace(/[^0-9]/g, '');
     const callUrl = cleanPhone ? `tel:+91${cleanPhone}` : '';
+    const shopCity = shop.city || shop.town || '';
+
+    const upiUri = upiId ? buildUpiUri({ upiId, shopName: shop.name || 'Zulora Seller', amount: shopTotal }) : '';
+    const dynamicQrSvg = upiUri ? renderQrSvgHtml(upiUri, 152, `UPI QR for ${shop.name}`) : '';
 
     return `
-      <div class="checkout-upi-box" style="margin-bottom:0.75rem;padding:0.85rem;background:#f8fafc;border:1px solid var(--border-subtle);border-radius:var(--radius-md);">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.4rem;">
+      <div class="checkout-upi-box" style="margin-bottom:0.75rem;padding:0.9rem;background:#f8fafc;border:1px solid var(--border-subtle);border-radius:var(--radius-md);text-align:left;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.45rem;">
           <div>
-            <div style="font-size:0.9rem;font-weight:800;color:var(--slate-900);display:flex;align-items:center;gap:0.3rem;">
-              🏪 ${escapeHtml(shop.name || 'Local Seller')}
-              ${shop.isVerified ? `<img src="${PLATFORM_CONSTANTS.VERIFIED_BADGE_URL}" alt="✓" class="verified-badge-sm" style="width:15px;height:15px;display:inline-block;" />` : ''}
+            <div style="font-size:0.92rem;font-weight:800;color:var(--slate-900);display:flex;align-items:center;gap:0.3rem;">
+              🏪 ${escapeHtml(shop.name || 'Neighbourhood Seller')}
+              ${shop.isVerified ? `<img src="${PLATFORM_CONSTANTS.VERIFIED_BADGE_URL}" alt="✓" class="verified-badge-sm" />` : ''}
             </div>
             <div style="font-size:0.75rem;color:var(--slate-600);margin-top:0.15rem;">
-              📞 Merchant Contact: ${callUrl ? `<a href="${callUrl}" style="color:var(--azure-700);font-weight:700;">+91 ${escapeHtml(shop.phone)}</a>` : '<span style="color:var(--slate-400);">Available after order</span>'}
+              📞 Contact: ${callUrl ? `<a href="${callUrl}" style="color:var(--azure-700);font-weight:700;">+91 ${escapeHtml(cleanPhone)}</a>` : '<span style="color:var(--slate-400);">Shared upon confirmation</span>'}
             </div>
           </div>
           <div style="text-align:right;">
-            <div style="font-size:1.15rem;font-weight:900;color:var(--azure-800);">₹${shopTotal.toFixed(2)}</div>
+            <div style="font-size:1.15rem;font-weight:900;color:var(--emerald-600);">₹${shopTotal.toFixed(2)}</div>
             <div style="font-size:0.72rem;color:var(--slate-400);">${group.items.length} item${group.items.length > 1 ? 's' : ''}</div>
           </div>
         </div>
 
-        <!-- Distance & Pricing breakdown -->
-        <div style="font-size:0.75rem;background:#fff;border:1px dashed var(--slate-200);padding:0.4rem 0.6rem;border-radius:var(--radius-sm);margin-bottom:0.5rem;color:var(--slate-600);">
-          📍 <strong>${group.distKm != null ? `${group.distKm} km away` : 'Local Store'}</strong> (₹${group.perKmRate || 15}/km delivery rate) • Min Order: ₹50<br/>
-          Fee: ₹${group.baseFee || 15} base + ₹${group.weightFee || 0} weight surcharge (${group.totalWeightKg.toFixed(1)}kg) • Merchant Self-Delivery
+        <div style="font-size:0.75rem;background:#ffffff;border:1px dashed var(--slate-200);padding:0.45rem 0.6rem;border-radius:var(--radius-sm);margin-bottom:0.65rem;color:var(--slate-600);">
+          📍 <strong>${group.distKm != null ? `${group.distKm} km away` : (shopCity ? escapeHtml(shopCity) : 'Set GPS for km')}</strong> (₹${group.perKmRate || 15}/km delivery) • Min Order: ₹50<br/>
+          Fee: ₹${group.baseFee || 15} base + ₹${group.weightFee || 0} weight surcharge (${group.totalWeightKg.toFixed(1)} kg) • Merchant Self-Delivery
         </div>
 
-        ${hasCustomQr
-          ? `<img src="${escapeHtml(shop.upiQrImageUrl)}" alt="Seller UPI QR Code" style="width:140px;height:140px;margin:0.5rem auto;display:block;border-radius:var(--radius-sm);border:1px solid var(--border-subtle);" />`
-          : ''
-        }
-        ${upiId
-          ? `<div style="margin-top:0.4rem;text-align:center;">
-               <div style="font-size:0.72rem;color:var(--slate-500);margin-bottom:0.2rem;">Pay directly to seller via UPI:</div>
-               <div class="checkout-upi-id-pill" style="display:inline-flex;align-items:center;gap:0.4rem;background:#fff;padding:0.25rem 0.65rem;border:1px solid var(--border-subtle);border-radius:var(--radius-full);">
-                 <span class="checkout-upi-id-text" style="font-weight:700;font-size:0.82rem;color:var(--azure-900);">${escapeHtml(upiId)}</span>
-                 <button type="button" onclick="navigator.clipboard.writeText('${escapeHtml(upiId)}').then(()=>{ alert('✓ UPI ID copied to clipboard!'); })" style="background:none;border:none;cursor:pointer;font-size:0.85rem;" title="Copy UPI ID">📋</button>
-               </div>
-             </div>`
-          : `<div style="font-size:0.75rem;color:var(--slate-500);margin-top:0.35rem;text-align:center;">Merchant accepts Cash on Delivery &amp; in-person UPI upon arrival.</div>`
-        }
+        ${(dynamicQrSvg || hasCustomQr) ? `
+          <div style="background:#ffffff;border:1px solid var(--azure-200);border-radius:var(--radius-md);padding:0.75rem;text-align:center;">
+            <div style="font-size:0.74rem;font-weight:800;color:var(--azure-800);margin-bottom:0.45rem;">
+              Scan &amp; Pay ₹${shopTotal.toFixed(2)} Directly to Seller
+            </div>
+            <div style="display:flex;justify-content:center;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+              ${dynamicQrSvg ? `
+                <div>
+                  ${dynamicQrSvg}
+                  <div style="font-size:0.68rem;color:var(--emerald-700);font-weight:700;margin-top:0.25rem;">⚡ Dynamic Amount UPI QR</div>
+                </div>
+              ` : ''}
+              ${hasCustomQr ? `
+                <div>
+                  <img src="${escapeHtml(shop.upiQrImageUrl)}" alt="Merchant QR Code" style="width:152px;height:152px;object-fit:contain;border-radius:10px;border:1px solid var(--border-subtle);padding:4px;background:#fff;" />
+                  <div style="font-size:0.68rem;color:var(--slate-500);font-weight:700;margin-top:0.25rem;">Merchant Uploaded QR</div>
+                </div>
+              ` : ''}
+            </div>
+            ${upiId ? `
+              <div style="margin-top:0.55rem;display:flex;align-items:center;justify-content:center;gap:0.45rem;flex-wrap:wrap;">
+                <div class="checkout-upi-id-pill">
+                  <span class="checkout-upi-id-text">${escapeHtml(upiId)}</span>
+                  <button type="button" onclick="navigator.clipboard.writeText('${escapeHtml(upiId)}').then(()=>{ window.showToast?.('✓ UPI ID copied!', 'success'); })" style="background:none;border:none;cursor:pointer;font-size:0.85rem;" title="Copy UPI ID">📋</button>
+                </div>
+                <a href="${escapeHtml(upiUri)}" class="btn btn-primary btn-sm" style="border-radius:var(--radius-full);">📲 Open UPI App</a>
+              </div>
+            ` : ''}
+          </div>
+        ` : `
+          <div style="font-size:0.76rem;color:var(--slate-500);text-align:center;padding:0.35rem;">
+            Merchant accepts Cash on Delivery &amp; in-person UPI upon arrival.
+          </div>
+        `}
       </div>
     `;
   }).join('');
@@ -841,61 +1147,67 @@ window.openCheckoutModal = function() {
   modal.id = 'checkoutModal';
   modal.className = 'modal-overlay open';
   modal.innerHTML = `
-    <div class="modal-box checkout-modal-box" role="dialog" aria-modal="true" aria-label="Complete Order">
+    <div class="modal-box checkout-modal-box" role="dialog" aria-modal="true" aria-label="Complete Order" style="max-width:560px;">
       <div class="modal-header">
         <h3 style="font-size:1.1rem;font-weight:800;">🛍️ Complete Your Order</h3>
         <button class="btn btn-icon" onclick="document.getElementById('checkoutModal').remove()">✕</button>
       </div>
-      <div class="modal-body" style="padding:1.25rem;">
-        <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">Full Name *</label>
-        <input id="coName" type="text" placeholder="Your name" value="${escapeHtml(currentUser?.displayName || '')}" style="width:100%;margin-bottom:0.65rem;padding:0.55rem;border:1px solid var(--border-subtle);border-radius:var(--radius-md);font-size:0.88rem;" />
+      <div class="modal-body" style="padding:1.15rem 1.25rem;">
+        <div style="font-size:0.74rem;color:var(--emerald-700);background:var(--emerald-50);border:1px solid var(--emerald-200);border-radius:var(--radius-sm);padding:0.45rem 0.65rem;margin-bottom:0.85rem;">
+          ⚡ Pre-filled from your saved profile &amp; location. Review or edit below before placing your order.
+        </div>
 
-        <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">Mobile Phone *</label>
-        <input id="coPhone" type="tel" placeholder="+91 XXXXXXXXXX" value="${escapeHtml(userLocation?.phone || '')}" style="width:100%;margin-bottom:0.65rem;padding:0.55rem;border:1px solid var(--border-subtle);border-radius:var(--radius-md);font-size:0.88rem;" />
-
-        <div style="display:flex;gap:0.6rem;margin-bottom:0.65rem;">
-          <div style="flex:1;">
-            <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">City / Town / Village *</label>
-            <input id="coCityTown" type="text" placeholder="e.g. Haldwani" value="${escapeHtml(userLocation?.town && userLocation.town !== 'All Locations' ? userLocation.town : '')}" style="width:100%;padding:0.55rem;border:1px solid var(--border-subtle);border-radius:var(--radius-md);font-size:0.88rem;" />
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;margin-bottom:0.65rem;">
+          <div>
+            <label style="font-size:0.78rem;font-weight:700;display:block;margin-bottom:0.2rem;">Full Name *</label>
+            <input id="coName" type="text" class="form-input" placeholder="Your name" value="${escapeHtml(preName)}" />
           </div>
-          <div style="flex:1;">
-            <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">State / Region</label>
-            <input id="coState" type="text" placeholder="e.g. Uttarakhand" value="${escapeHtml(userLocation?.region || '')}" style="width:100%;padding:0.55rem;border:1px solid var(--border-subtle);border-radius:var(--radius-md);font-size:0.88rem;" />
+          <div>
+            <label style="font-size:0.78rem;font-weight:700;display:block;margin-bottom:0.2rem;">Mobile Phone *</label>
+            <input id="coPhone" type="tel" class="form-input" placeholder="10-digit mobile" value="${escapeHtml(prePhone)}" />
           </div>
         </div>
 
-        <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">Delivery Address / Street / House No. / Landmark *</label>
-        <textarea id="coAddress" rows="2" placeholder="House no, street name, nearest landmark" style="width:100%;margin-bottom:0.65rem;padding:0.55rem;border:1px solid var(--border-subtle);border-radius:var(--radius-md);font-size:0.88rem;">${escapeHtml(userLocation?.street || userLocation?.address || '')}</textarea>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;margin-bottom:0.65rem;">
+          <div>
+            <label style="font-size:0.78rem;font-weight:700;display:block;margin-bottom:0.2rem;">City / Town / Village *</label>
+            <input id="coCityTown" type="text" class="form-input" placeholder="e.g. Haldwani" value="${escapeHtml(preCity)}" />
+          </div>
+          <div>
+            <label style="font-size:0.78rem;font-weight:700;display:block;margin-bottom:0.2rem;">State / Region</label>
+            <input id="coState" type="text" class="form-input" placeholder="e.g. Uttarakhand" value="${escapeHtml(preState)}" />
+          </div>
+        </div>
 
-        <label style="font-size:0.8rem;font-weight:700;display:block;margin-bottom:0.25rem;">Payment Option *</label>
+        <label style="font-size:0.78rem;font-weight:700;display:block;margin-bottom:0.2rem;">Delivery Address / House No. / Landmark *</label>
+        <textarea id="coAddress" rows="2" class="form-input" placeholder="House no, street name, nearest landmark" style="margin-bottom:0.75rem;">${escapeHtml(preStreet)}</textarea>
+
+        <label style="font-size:0.78rem;font-weight:700;display:block;margin-bottom:0.3rem;">Payment Option *</label>
         <div style="display:flex;gap:1.5rem;margin-bottom:0.85rem;">
-          <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.85rem;cursor:pointer;font-weight:600;">
-            <input type="radio" name="coPayment" value="UPI" checked /> 💳 Direct UPI
+          <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.85rem;cursor:pointer;font-weight:700;">
+            <input type="radio" name="coPayment" value="UPI" ${defaultPayment === 'UPI' ? 'checked' : ''} /> 💳 Direct UPI (Instant QR)
           </label>
-          <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.85rem;cursor:pointer;font-weight:600;">
-            <input type="radio" name="coPayment" value="COD" /> 💵 Cash on Delivery
+          <label style="display:flex;align-items:center;gap:0.35rem;font-size:0.85rem;cursor:pointer;font-weight:700;">
+            <input type="radio" name="coPayment" value="COD" ${defaultPayment === 'COD' ? 'checked' : ''} /> 💵 Cash on Delivery
           </label>
         </div>
 
-        <div id="upiQrSection" style="margin-bottom:0.85rem;">
-          <p style="font-size:0.75rem;color:var(--slate-500);margin-bottom:0.4rem;">
-            Pay directly to seller via UPI:
-          </p>
+        <div id="upiQrSection" style="margin-bottom:0.85rem;${defaultPayment === 'COD' ? 'display:none;' : ''}">
           ${qrSections}
         </div>
 
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.65rem 0.85rem;background:var(--azure-50);border-radius:var(--radius-md);margin-bottom:0.75rem;">
-          <span style="font-size:0.85rem;color:var(--azure-900);font-weight:800;">Total Payable Amount:</span>
-          <strong style="font-size:1.15rem;color:var(--azure-800);">₹${grandTotal.toFixed(2)}</strong>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.7rem 0.9rem;background:var(--azure-50);border:1px solid var(--azure-200);border-radius:var(--radius-md);margin-bottom:0.65rem;">
+          <span style="font-size:0.86rem;color:var(--azure-900);font-weight:800;">Total Payable Amount:</span>
+          <strong style="font-size:1.2rem;color:var(--azure-800);">₹${grandTotal.toFixed(2)}</strong>
         </div>
 
-        <p style="font-size:0.74rem;color:var(--slate-500);text-align:center;margin:0;line-height:1.5;">
-          By placing an order, you agree to the <a href="#" onclick="window.openPolicyModal();return false;" style="color:var(--azure-700);text-decoration:underline;font-weight:700;">Zulora Local Policy</a> and <a href="#" onclick="window.openTermsModal();return false;" style="color:var(--azure-700);text-decoration:underline;font-weight:700;">Terms &amp; Conditions</a> (Self-Delivery, Min ₹50, Direct UPI/COD).
+        <p style="font-size:0.73rem;color:var(--slate-500);text-align:center;margin:0;line-height:1.45;">
+          By placing an order, you agree to the <a href="#" onclick="window.openPolicyModal();return false;" style="color:var(--azure-700);text-decoration:underline;font-weight:700;">Zulora Local Policy</a> and <a href="#" onclick="window.openTermsModal();return false;" style="color:var(--azure-700);text-decoration:underline;font-weight:700;">Terms &amp; Conditions</a>.
         </p>
       </div>
       <div class="modal-footer" style="display:flex;justify-content:space-between;">
         <button class="btn btn-ghost" onclick="document.getElementById('checkoutModal').remove()">Cancel</button>
-        <button class="btn btn-primary" onclick="window.executeOrderPlacement()" style="background:var(--emerald-600);border-color:var(--emerald-600);font-weight:800;">Place Order ✓</button>
+        <button class="btn btn-success" onclick="window.executeOrderPlacement()" style="font-weight:800;padding:0.55rem 1.25rem;">Place Order ✓</button>
       </div>
     </div>
   `;
@@ -929,12 +1241,36 @@ window.executeOrderPlacement = async function() {
   if (!cityTown) { showToast('Please enter your City / Town / Village name.', 'warning'); return; }
   if (!address) { showToast('Please enter your delivery street or landmark address.', 'warning'); return; }
 
+  // Persist buyer profile & address for seamless future auto-fill
+  userProfile = { ...userProfile, name, phone };
+  saveUserProfile(userProfile);
+  userLocation = {
+    ...(userLocation || {}),
+    town: cityTown,
+    region: state || userLocation?.region || '',
+    street: address,
+    phone,
+    address: `${address}, ${cityTown}${state ? ', ' + state : ''}`
+  };
+  saveUserLocation(userLocation);
+  updateLocationUI();
+
+  if (db && !isConfigPlaceholder) {
+    setDoc(doc(db, 'users', currentUser.uid), {
+      uid: currentUser.uid,
+      displayName: name,
+      phone,
+      location: userLocation,
+      updatedAt: serverTimestamp()
+    }, { merge: true }).catch(() => {});
+  }
+
   const fullDeliveryAddress = `${address}, ${cityTown}${state ? ', ' + state : ''}`;
 
   const groups = groupCartByShop(allShops, userLocation);
   const anyBelow = Object.values(groups).find(g => g.isBelowMinOrder);
   if (anyBelow) {
-    showToast(`Order from "${anyBelow.shop.name || 'Store'}" is below the ₹50 minimum order value. Please add ₹${anyBelow.shortfall.toFixed(2)} more.`, 'warning');
+    showToast(`Order from "${anyBelow.shop.name || 'Store'}" is below the ₹50 minimum order value.`, 'warning');
     return;
   }
 
@@ -960,7 +1296,7 @@ window.executeOrderPlacement = async function() {
         : null,
       sellerUid: group.shop.sellerUid || group.shop.ownerUid || group.shop.ownerId || group.items[0]?.product?.sellerUid || group.items[0]?.product?.ownerUid || shopId,
       shopId,
-      shopName: group.shop.name || 'Local Seller',
+      shopName: group.shop.name || 'Neighbourhood Seller',
       shopPhone: group.shop.phone || group.items[0]?.product?.sellerPhone || '',
       shopEmail: group.shop.ownerEmail || group.shop.email || '',
       shopUpiId: group.shop.upiId || '',
@@ -1024,21 +1360,20 @@ window.executeOrderPlacement = async function() {
     notifyOrderStatus(orderData.orderId, 'Placed');
   }
 
-  // Clear cart
   clearCart();
   updateCartUI();
 
   document.getElementById('checkoutModal')?.remove();
   closeCart();
   refreshProductGrid();
-  showOrderSuccessModal(orderIds, { name, phone, address, payment });
+  showOrderSuccessModal(orderIds, { name, phone, address: fullDeliveryAddress, payment });
 };
 
 function showOrderSuccessModal(orderIds, buyer) {
   document.getElementById('orderSuccessModal')?.remove();
 
   const waLinks = orderIds.map(({ orderId, shop, orderData }) => {
-    const waNum = (shop.whatsapp || shop.phone || PLATFORM_CONSTANTS.HELPLINE_WHATSAPP).replace(/[^0-9]/g, '');
+    const waNum = (shop.whatsapp || shop.phone || orderData.sellerPhone || PLATFORM_CONSTANTS.HELPLINE_WHATSAPP).replace(/[^0-9]/g, '');
     const cleanNum = waNum.startsWith('91') ? waNum : '91' + waNum;
     const msg = encodeURIComponent(
       `🛒 *New Order on Zulora Local (#${orderId})*\n\n` +
@@ -1073,7 +1408,7 @@ function showOrderSuccessModal(orderIds, buyer) {
         </p>
         <div style="display:flex;flex-direction:column;gap:0.55rem;">
           ${waLinks}
-          <a href="./orders.html" class="btn btn-primary" style="padding:0.6rem 1rem;font-weight:800;background:var(--azure-600);">
+          <a href="./orders.html" class="btn btn-primary" style="padding:0.65rem 1rem;font-weight:800;">
             📦 Track My Orders
           </a>
           <a href="tel:${PLATFORM_CONSTANTS.HELPLINE_PHONE}" class="btn btn-ghost" style="font-size:0.8rem;">

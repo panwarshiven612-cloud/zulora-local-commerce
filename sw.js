@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zulora-local-v11';
+const CACHE_NAME = 'zulora-local-v12';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -23,6 +23,7 @@ const STATIC_ASSETS = [
   './js/location-modal.js',
   './js/product-modal.js',
   './js/storefront.js',
+  './js/upi-qr.js',
   './js/pwa.js',
   './js/app.js',
   './js/seller.js',

@@ -8,7 +8,7 @@
 
 import {
   auth, db, googleProvider, signInWithPopup, signOut, onAuthStateChanged,
-  collection, doc, getDoc, updateDoc, serverTimestamp, query, where, onSnapshot, isConfigPlaceholder
+  collection, doc, getDoc, addDoc, updateDoc, serverTimestamp, query, where, onSnapshot, isConfigPlaceholder
 } from './firebase-init.js';
 import { PLATFORM_CONSTANTS } from './config.js';
 import { showUnauthorizedDomainDialog } from './auth.js';
@@ -318,9 +318,13 @@ function renderOrders() {
             ${isCancelable
               ? `<button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;border-radius:var(--radius-full);font-weight:700;" onclick="window.cancelOrder('${order.docId}')">✕ Cancel Order (5m)</button>`
               : ''}
-            <button class="btn btn-primary btn-sm" onclick='window.handleBuyAgain(${JSON.stringify(order.items || [])})'>
+            <button class="btn btn-primary btn-sm" onclick="window.handleBuyAgain('${escapeHtml(order.docId)}')">
               🔁 Buy Again
             </button>
+            ${(order.buyerDeliveredConfirmed || status === 'Verified Delivered' || status === 'Delivered')
+              ? `<button class="btn btn-secondary btn-sm" onclick="window.openOrderFeedback('${escapeHtml(order.docId)}')">⭐ Rate Order</button>`
+              : ''
+            }
             ${(order.buyerDeliveredConfirmed || status === 'Verified Delivered')
               ? `<span style="background:var(--emerald-50,#ecfdf5);color:var(--emerald-700,#047857);border:1px solid var(--emerald-300,#a7f3d0);padding:0.3rem 0.65rem;border-radius:var(--radius-full);font-size:0.75rem;font-weight:700;display:inline-flex;align-items:center;gap:0.25rem;">✓ Delivery Confirmed</span>`
               : (status === 'Out for Delivery' || status === 'Delivered' || status === 'Packed / Out for Delivery')
@@ -351,8 +355,10 @@ function renderOrders() {
 }
 
 // ─── Buy Again ────────────────────────────────────────────────────────────────
-window.handleBuyAgain = function(items) {
-  if (!items || !items.length) return;
+window.handleBuyAgain = function(orderDocId) {
+  const order = userOrders.find(o => o.docId === orderDocId);
+  const items = order?.items || [];
+  if (!items.length) return;
   try {
     const rawCart = JSON.parse(localStorage.getItem('zulora_cart') || '{}');
     items.forEach(item => {
@@ -371,6 +377,37 @@ window.handleBuyAgain = function(items) {
     setTimeout(() => window.location.href = './index.html', 500);
   } catch(e) {
     window.location.href = './index.html';
+  }
+};
+
+// ─── Customer Order & Delivery Feedback ──────────────────────────────────────
+window.openOrderFeedback = async function(orderDocId) {
+  const order = userOrders.find(o => o.docId === orderDocId);
+  if (!order) return;
+  const ratingRaw = prompt(`Rate your order #${order.orderCode || order.orderId || orderDocId} from ${order.shopName || 'Seller'} (1 to 5 stars):`, '5');
+  if (ratingRaw == null) return;
+  const rating = Math.min(5, Math.max(1, parseInt(ratingRaw, 10) || 5));
+  const msg = prompt('Optional feedback about delivery speed, freshness, or merchant service:', '');
+  if (msg == null) return;
+
+  if (db && !isConfigPlaceholder) {
+    try {
+      await addDoc(collection(db, 'feedback'), {
+        uid: currentUser?.uid || 'buyer',
+        email: currentUser?.email || '',
+        name: order.buyerName || currentUser?.displayName || 'Customer',
+        orderId: order.orderCode || order.orderId || orderDocId,
+        shopId: order.shopId || '',
+        shopName: order.shopName || '',
+        rating,
+        category: 'Order & Delivery',
+        message: msg.trim() || `Rated ${rating}/5 stars`,
+        createdAt: serverTimestamp()
+      });
+      showToast('⭐ Thank you for your order feedback!', 'success');
+    } catch (err) {
+      showToast('Could not save feedback: ' + err.message, 'error');
+    }
   }
 };
 

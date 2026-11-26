@@ -1,25 +1,26 @@
 /* ==========================================================================
    Zulora Local — Design Tokens (css/tokens.css)
-   Blinkit/Swiggy-Grade Quick-Commerce Theme & Visual System
+   Zomato / Blinkit Inspired Quick-Commerce Theme & Visual System
    ========================================================================== */
 
 :root {
-  /* Quick Commerce Primary Palette */
+  /* Quick Commerce Primary Green (Blinkit-Inspired Action) */
   --emerald-50:  #ecfdf5;
   --emerald-100: #d1fae5;
   --emerald-200: #a7f3d0;
+  --emerald-300: #6ee7b7;
   --emerald-500: #10b981;
-  --emerald-600: #059669; /* Primary Quick-Commerce Action Green */
-  --emerald-700: #047857;
+  --emerald-600: #0c831f;
+  --emerald-700: #046c19;
   --emerald-800: #065f46;
 
-  /* Azure Accent Palette */
+  /* Brand Azure & Zomato Accent Palette */
   --azure-50:  #f0f9ff;
   --azure-100: #e0f2fe;
   --azure-200: #bae6fd;
   --azure-300: #7dd3fc;
   --azure-400: #38bdf8;
-  --azure-500: #0284c7; /* Primary Azure */
+  --azure-500: #0284c7;
   --azure-600: #0369a1;
   --azure-700: #075985;
   --azure-800: #0c4a6e;
@@ -40,48 +41,57 @@
   /* Alert & Status Palette */
   --amber-50:  #fffbeb;
   --amber-100: #fef3c7;
+  --amber-200: #fde68a;
+  --amber-300: #fcd34d;
   --amber-500: #f59e0b;
   --amber-600: #d97706;
   --amber-700: #b45309;
+  --amber-800: #92400e;
+  --amber-900: #78350f;
 
   --rose-50:  #fff1f2;
   --rose-100: #ffe4e6;
+  --rose-200: #fecdd3;
+  --rose-300: #fda4af;
   --rose-500: #f43f5e;
-  --rose-600: #e11d48;
+  --rose-600: #e23744;
   --rose-700: #be123c;
 
   /* Surface & Border Tokens */
-  --surface-body:  #f8fafc;
+  --surface-body:  #f4f6fb;
   --surface-card:  #ffffff;
   --surface-muted: #f1f5f9;
-  --border-subtle: #e2e8f0;
+  --pearl-glass:   rgba(255, 255, 255, 0.94);
+  --border-subtle: #e5e7eb;
   --border-strong: #cbd5e1;
 
   /* Typography Scale */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --text-2xs: 0.65rem;
-  --text-xs:  0.72rem;
-  --text-sm:  0.82rem;
-  --text-base:0.92rem;
-  --text-md:  1.02rem;
-  --text-lg:  1.15rem;
-  --text-xl:  1.35rem;
-  --text-2xl: 1.6rem;
+  --text-xs:  0.75rem;
+  --text-sm:  0.85rem;
+  --text-base:0.94rem;
+  --text-md:  1.05rem;
+  --text-lg:  1.2rem;
+  --text-xl:  1.4rem;
+  --text-2xl: 1.65rem;
 
   /* Radii */
   --radius-xs:   4px;
-  --radius-sm:   6px;
-  --radius-md:   10px;
-  --radius-lg:   14px;
-  --radius-xl:   18px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   20px;
   --radius-full: 9999px;
 
-  /* Shadows (Crisp & High-Performance) */
+  /* Shadows & Transitions */
   --shadow-xs:    0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-sm:    0 2px 4px rgba(15, 23, 42, 0.06);
-  --shadow-md:    0 4px 12px rgba(15, 23, 42, 0.08);
-  --shadow-lg:    0 10px 24px rgba(15, 23, 42, 0.12);
-  --shadow-float: 0 12px 36px rgba(2, 132, 199, 0.18);
+  --shadow-sm:    0 2px 8px rgba(15, 23, 42, 0.06);
+  --shadow-md:    0 6px 18px rgba(15, 23, 42, 0.08);
+  --shadow-lg:    0 14px 36px rgba(15, 23, 42, 0.14);
+  --shadow-azure: 0 4px 16px rgba(2, 132, 199, 0.16);
+  --shadow-float: 0 12px 32px rgba(12, 131, 31, 0.24);
+  --transition-fast: 0.16s ease;
 
   /* Z-Index Hierarchy */
   --z-sticky: 100;

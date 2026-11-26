@@ -334,9 +334,9 @@
     </div>
 
     <div class="navbar-actions">
-      <a href="./index.html" class="btn btn-seller">🛍️ Buyer Storefront</a>
-      <a href="./orders.html" class="btn btn-orders">📦 My Orders</a>
-      <button id="btnSellerLogout" class="btn btn-signout hidden">🚪 Logout</button>
+      <a href="./index.html" class="btn btn-secondary btn-sm" style="display:inline-flex !important;">🛍️ <span class="btn-text-hide">Storefront</span></a>
+      <a href="./orders.html" class="btn btn-secondary btn-sm" style="display:inline-flex !important;">📦 <span class="btn-text-hide">My Orders</span></a>
+      <button id="btnSellerLogout" class="btn btn-danger btn-sm hidden">🚪 Logout</button>
     </div>
   </nav>
 
@@ -355,7 +355,7 @@
   <section id="authSection" class="auth-gate hidden">
     <img src="https://i.postimg.cc/V621Yk7C/IMG-20260531-172651.jpg" alt="Zulora" class="auth-gate-logo" />
     <h1>🛒 Seller / Merchant Mode</h1>
-    <p>Sign in with your Google account to activate your seller dashboard, manage products, and receive live orders from buyers near you.</p>
+    <p>Sign in with your Google account to register as an Authorized Seller, upload products, and receive live orders from buyers near you.</p>
     <button id="btnSellerLogin" class="btn-seller-login">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20" height="20">
         <path fill="#4285F4" d="M24 9.5c3.1 0 5.8 1.1 8 2.9l5.9-5.9C34.4 3.5 29.5 1.5 24 1.5 14.9 1.5 7.2 7.1 4 15l6.9 5.4C12.5 13.6 17.8 9.5 24 9.5z"/>
@@ -363,9 +363,91 @@
         <path fill="#FBBC05" d="M10.9 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.1.8-4.6L3.4 14C1.8 17.1 1 20.5 1 24s.8 6.9 2.4 10l7.5-5.4z"/>
         <path fill="#EA4335" d="M24 46.5c5.5 0 10.1-1.8 13.5-4.9l-7.4-5.7c-1.8 1.2-4.2 1.9-6.1 1.9-6.2 0-11.5-4.1-13.1-9.9l-6.9 5.4C7.2 40.9 14.9 46.5 24 46.5z"/>
       </svg>
-      Sign in with Google to activate Seller / Merchant Mode
+      Sign in with Google to enter Seller Studio
     </button>
     <p class="text-sm">🔒 Your data stays private. We only access your name and email to create your seller profile.</p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════
+       BECOME AN AUTHORIZED SELLER (ONBOARDING GATE)
+  ═══════════════════════════════════════════════ -->
+  <section id="sellerOnboardingSection" class="seller-layout hidden">
+    <div class="seller-card" style="max-width:740px;margin:1rem auto;border-top:4px solid var(--emerald-600);">
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+        <div style="font-size:2rem;">🏪</div>
+        <div>
+          <h1 style="font-size:1.35rem;font-weight:800;color:var(--slate-900);margin:0;">Become an Authorized Seller</h1>
+          <p class="text-sm" style="margin:0.15rem 0 0;">Complete your store registration below to unlock product uploads and live customer orders on Zulora Local.</p>
+        </div>
+      </div>
+
+      <form id="sellerOnboardingForm" autocomplete="off">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="onbShopName">Shop / Business Name *</label>
+            <input type="text" id="onbShopName" placeholder="e.g. Sharma Fresh Mart" required />
+          </div>
+          <div class="form-group">
+            <label for="onbShopHandle">@Handle (unique) *</label>
+            <input type="text" id="onbShopHandle" placeholder="e.g. sharma_mart" required />
+          </div>
+          <div class="form-group">
+            <label for="onbShopCategory">Primary Category *</label>
+            <select id="onbShopCategory" required>
+              <option value="Grocery">🛒 Grocery</option>
+              <option value="Food">🍕 Food</option>
+              <option value="Crops">🌾 Crops</option>
+              <option value="Sweets">🍬 Sweets</option>
+              <option value="Electronics">📱 Electronics</option>
+              <option value="Fashion">👗 Fashion</option>
+              <option value="Toys">🧸 Toys</option>
+              <option value="Mixed">🏪 Mixed / General</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="onbShopCity">Town / City / Village *</label>
+            <input type="text" id="onbShopCity" placeholder="e.g. Haldwani" required />
+          </div>
+          <div class="form-group">
+            <label for="onbShopState">State *</label>
+            <input type="text" id="onbShopState" placeholder="e.g. Uttarakhand" required />
+          </div>
+          <div class="form-group">
+            <label for="onbShopPhone">Mobile Phone / WhatsApp *</label>
+            <input type="tel" id="onbShopPhone" placeholder="10-digit mobile number" required />
+          </div>
+          <div class="form-group">
+            <label for="onbShopUpi">UPI ID (Auto-generates Checkout QR)</label>
+            <input type="text" id="onbShopUpi" placeholder="e.g. merchant@okicici" />
+          </div>
+          <div class="form-group">
+            <label for="onbShopRadius">Delivery Radius (km) *</label>
+            <input type="number" id="onbShopRadius" value="5" min="1" max="50" step="0.5" required />
+          </div>
+
+          <div class="form-group form-full">
+            <label>📍 Shop GPS Location (for exact km distance)</label>
+            <div style="display:flex;gap:0.65rem;align-items:center;flex-wrap:wrap;">
+              <button type="button" id="btnOnbCaptureGps" class="btn btn-secondary btn-sm">🛰️ Capture My Shop GPS</button>
+              <span id="onbGpsDisplay" style="font-size:0.8rem;color:var(--slate-500);font-weight:600;">Recommended so nearby buyers can see exact km distance</span>
+            </div>
+          </div>
+
+          <div class="form-group form-full" style="background:var(--azure-50);border:1.5px solid var(--azure-200);border-radius:var(--radius-md);padding:1rem;">
+            <label style="display:flex;align-items:flex-start;gap:0.6rem;cursor:pointer;font-size:0.82rem;color:var(--slate-800);font-weight:600;">
+              <input type="checkbox" id="onbAgreeTerms" required style="margin-top:3px;" />
+              <span>I accept the <strong>Zulora Local Authorized Seller Compliance &amp; Terms Agreement</strong> (accurate pricing &amp; stock, merchant self-delivery, 3% commission on delivered orders, zero fake/prohibited items).</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="mt-2">
+          <button type="submit" id="btnCompleteOnboarding" class="btn btn-success btn-lg" style="font-weight:800;">
+            ✓ Become an Authorized Seller &amp; Open Studio
+          </button>
+        </div>
+      </form>
+    </div>
   </section>
 
   <!-- ═══════════════════════════════════════════════
@@ -373,10 +455,13 @@
   ═══════════════════════════════════════════════ -->
   <div id="dashboardSection" class="seller-layout">
 
-    <!-- TOP BAR: seller name + shop status toggle -->
+    <!-- TOP BAR: seller name + verified badge + shop status toggle -->
     <div class="seller-topbar">
-      <div class="seller-topbar-name">
-        👋 Hello, <span id="sellerNameDisplay">Seller</span>
+      <div class="seller-topbar-name" style="display:flex;align-items:center;gap:0.35rem;flex-wrap:wrap;">
+        <span>👋 Hello, <span id="sellerNameDisplay">Seller</span></span>
+        <span id="sellerVerifiedBadge" class="hidden" title="Verified Authorized Seller">
+          <img src="https://i.postimg.cc/MZVr9JS2/LS20260530205459.png" alt="✓" class="verified-badge-sm" />
+        </span>
       </div>
       <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
         <button type="button" id="btnSellerTestNotif" class="btn btn-secondary btn-sm" style="font-size:0.78rem;padding:0.35rem 0.65rem;" title="Enable &amp; Test Order Alerts">
@@ -639,10 +724,10 @@
           <thead>
             <tr>
               <th>Product</th>
+              <th>Category</th>
               <th>Price</th>
               <th>Stock</th>
               <th>Status</th>
-              <th>Age</th>
               <th>Sales</th>
               <th>Actions</th>
             </tr>
@@ -661,7 +746,7 @@
 
     <!-- ─── SHOP PROFILE FORM ─── -->
     <div class="seller-card">
-      <div class="seller-card-title">🏪 Shop Profile & Settings</div>
+      <div class="seller-card-title">🏪 Shop Profile &amp; Settings</div>
       <form id="shopProfileForm" autocomplete="off">
         <div class="form-grid">
           <div class="form-group">
@@ -695,6 +780,11 @@
           </div>
 
           <div class="form-group">
+            <label for="shopState">State / Region</label>
+            <input type="text" id="shopState" placeholder="e.g. Uttarakhand" />
+          </div>
+
+          <div class="form-group">
             <label for="shopPhone">Phone Number</label>
             <input type="tel" id="shopPhone" placeholder="e.g. 9876543210" />
           </div>
@@ -710,9 +800,9 @@
           </div>
 
           <div class="form-group form-full">
-            <label for="shopUpiQrImage">Upload Store UPI QR Code Image (Cloudinary)</label>
+            <label for="shopUpiQrImage">Upload Store UPI QR Code Image (Optional)</label>
             <input type="file" id="shopUpiQrImage" accept="image/*" style="font-size:0.85rem;" />
-            <p class="text-sm" style="margin-top:0.25rem;">Buyers will only see a QR code if you upload one here; otherwise buyers will see your UPI ID.</p>
+            <p class="text-sm" style="margin-top:0.25rem;">Entering your UPI ID above automatically generates a live scannable UPI QR code at checkout! You can also upload a custom QR image here.</p>
             <img id="shopQrPreview" src="" alt="Current QR Code" class="hidden" style="width:110px;height:110px;object-fit:contain;border:1px solid var(--slate-300);border-radius:var(--radius-sm);margin-top:0.5rem;" />
           </div>
 

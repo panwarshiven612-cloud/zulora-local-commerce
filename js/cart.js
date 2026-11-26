@@ -1,5 +1,5 @@
 /**
- * Zulora Local — Modular Smart Cart & Delivery Pricing Engine v2
+ * Zulora Local — Modular Smart Cart & Delivery Pricing Engine v3
  * Multi-shop order splitting, distance & weight pricing, localStorage persistence
  */
 
@@ -42,7 +42,8 @@ export function saveCartToStorage() {
 
 export function addToCart(product) {
   if (!product || !product.id) return;
-  if (product.stock <= 0) {
+  const stockVal = product.stock != null ? product.stock : product.stockCount;
+  if (stockVal != null && stockVal <= 0) {
     showToast('This product is currently out of stock.', 'warning');
     return;
   }
@@ -100,18 +101,20 @@ export function groupCartByShop(allShops = new Map(), userLocation = null) {
   const groups = {};
 
   Object.values(cart).forEach(item => {
-    const shopId = item.product.shopId || 'shop_direct';
+    const shopId = item.product.shopId || item.product.sellerUid || item.product.ownerUid || 'shop_direct';
     if (!groups[shopId]) {
       const rawShop = allShops.get(shopId);
       const shop = rawShop ? { ...rawShop } : {
         id: shopId,
-        sellerUid: item.product.sellerUid || shopId,
-        name: item.product.shopName || 'Local Seller',
+        sellerUid: item.product.sellerUid || item.product.ownerUid || shopId,
+        ownerUid: item.product.ownerUid || item.product.sellerUid || shopId,
+        name: item.product.shopName || 'Neighbourhood Seller',
+        phone: item.product.sellerPhone || '',
         lat: null,
         lng: null
       };
       if (!shop.sellerUid) {
-        shop.sellerUid = item.product.sellerUid || shop.ownerUid || shop.ownerId || shopId;
+        shop.sellerUid = item.product.sellerUid || item.product.ownerUid || shop.ownerUid || shop.ownerId || shopId;
       }
       groups[shopId] = {
         shop,

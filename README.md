@@ -60,9 +60,21 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function isSupremeAdmin() {
-      return request.auth != null && 
-        (request.auth.token.email == 'zulora.help@gmail.com' || 
-         (request.auth.token.email_verified == true && request.auth.token.email == 'zulora.help@gmail.com'));
+      return request.auth != null &&
+        request.auth.token.email != null &&
+        request.auth.token.email.lower() == 'zulora.help@gmail.com';
+    }
+
+    function isProductOwner() {
+      return request.auth != null && (
+        resource.data.ownerUid == request.auth.uid ||
+        resource.data.sellerUid == request.auth.uid ||
+        resource.data.shopId == request.auth.uid ||
+        (resource.data.shopId is string &&
+          exists(/databases/$(database)/documents/shops/$(resource.data.shopId)) &&
+          (get(/databases/$(database)/documents/shops/$(resource.data.shopId)).data.ownerUid == request.auth.uid ||
+           get(/databases/$(database)/documents/shops/$(resource.data.shopId)).data.sellerUid == request.auth.uid))
+      );
     }
 
     match /users/{userId} {
@@ -72,38 +84,48 @@ service cloud.firestore {
 
     match /shops/{shopId} {
       allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && 
-        (resource.data.ownerUid == request.auth.uid || 
-         resource.data.sellerUid == request.auth.uid || 
-         shopId == request.auth.uid || 
+      allow create: if request.auth != null &&
+        (request.resource.data.ownerUid == request.auth.uid ||
+         request.resource.data.sellerUid == request.auth.uid ||
+         shopId == request.auth.uid ||
+         isSupremeAdmin());
+      allow update, delete: if request.auth != null &&
+        (resource.data.ownerUid == request.auth.uid ||
+         resource.data.sellerUid == request.auth.uid ||
+         shopId == request.auth.uid ||
          isSupremeAdmin());
     }
 
     match /products/{productId} {
       allow read: if true;
-      allow create: if request.auth != null;
-      allow update: if (request.auth != null && 
-        (resource.data.ownerUid == request.auth.uid || 
-         resource.data.sellerUid == request.auth.uid || 
-         resource.data.shopId == request.auth.uid || 
-         isSupremeAdmin())) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'salesCount', 'inStock']));
-      allow delete: if request.auth != null && 
-        (resource.data.ownerUid == request.auth.uid || 
-         resource.data.sellerUid == request.auth.uid || 
-         resource.data.shopId == request.auth.uid || 
+      allow create: if request.auth != null &&
+        (request.resource.data.ownerUid == request.auth.uid ||
+         request.resource.data.sellerUid == request.auth.uid ||
+         request.resource.data.shopId == request.auth.uid ||
          isSupremeAdmin());
+      allow update: if isProductOwner() || isSupremeAdmin() ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'stockCount', 'salesCount', 'inStock']));
+      allow delete: if isProductOwner() || isSupremeAdmin();
     }
 
     match /orders/{orderId} {
       allow read: if true;
       allow create: if true;
-      allow update: if true;
-      allow delete: if request.auth != null && 
-        (resource.data.sellerUid == request.auth.uid || 
-         resource.data.shopId == request.auth.uid || 
+      allow update: if request.auth != null &&
+        (resource.data.sellerUid == request.auth.uid ||
+         resource.data.buyerUid == request.auth.uid ||
+         resource.data.shopId == request.auth.uid ||
          isSupremeAdmin());
+      allow delete: if request.auth != null &&
+        (resource.data.sellerUid == request.auth.uid ||
+         resource.data.shopId == request.auth.uid ||
+         isSupremeAdmin());
+    }
+
+    match /feedback/{fbId} {
+      allow read: if request.auth != null;
+      allow create: if true;
+      allow update, delete: if isSupremeAdmin();
     }
   }
 }
