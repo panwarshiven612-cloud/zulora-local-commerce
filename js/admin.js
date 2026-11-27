@@ -517,7 +517,9 @@ function renderOrdersTable(orders) {
 }
 
 window.adminDeleteOrder = async function(orderId) {
-  if (!auth?.currentUser) {
+  if (auth && typeof auth.authStateReady === 'function') await auth.authStateReady();
+  const activeUser = auth?.currentUser || currentAdmin;
+  if (!activeUser) {
     showToast('Admin session required to delete orders.', 'warning');
     return;
   }

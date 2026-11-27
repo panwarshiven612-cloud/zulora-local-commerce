@@ -31,6 +31,9 @@ let unsubscribeShopDoc = null;
 let selectedFiles = []; // Array of files from multi-image input
 let activeOrderFilter = 'all';
 let onbGpsCoords = null;
+// Guards to prevent stale ₹0 flash before onSnapshot resolves
+let _productsReady = false;
+let _ordersReady = false;
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -185,6 +188,9 @@ function detachAllSellerListeners() {
   if (unsubscribeOwnerProds) { unsubscribeOwnerProds(); unsubscribeOwnerProds = null; }
   if (unsubscribeShopProds) { unsubscribeShopProds(); unsubscribeShopProds = null; }
   if (unsubscribeShopDoc) { unsubscribeShopDoc(); unsubscribeShopDoc = null; }
+  // Reset ready flags on logout so next login starts clean
+  _productsReady = false;
+  _ordersReady = false;
 }
 
 function showDashboard(user) {
@@ -788,6 +794,7 @@ function syncMergedSellerProducts() {
   const prods = Array.from(merged.values());
   prods.sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a));
   sellerProducts = prods;
+  _productsReady = true;
   renderSellerProducts();
   updateDashboardStats();
 }
@@ -946,6 +953,24 @@ window.deleteProductItem = async function(prodId) {
   const prod = sellerProducts.find(p => p.id === prodId);
   const title = prod?.title ? `"${prod.title}"` : 'this product';
 
+  // Pre-check ownership to surface a clear diagnostic before hitting Firestore
+  const isAdmin = activeUser.email?.toLowerCase() === 'zulora.help@gmail.com';
+  const isOwner = prod && (
+    prod.ownerUid === activeUser.uid ||
+    prod.sellerUid === activeUser.uid ||
+    prod.shopId === activeUser.uid ||
+    prod.shopId === currentShop?.id
+  );
+  if (prod && !isOwner && !isAdmin) {
+    showToast(
+      `Delete failed: You do not own ${title}. ` +
+      `Product ownerUid: ${prod.ownerUid || '—'}, your UID: ${activeUser.uid}. ` +
+      `Ask the Supreme Admin (zulora.help@gmail.com) to remove it if this is a legacy document.`,
+      'error', 8000
+    );
+    return;
+  }
+
   if (!confirm(`Are you sure you want to permanently delete ${title}?\nThis action cannot be undone and will immediately remove it from the storefront.`)) return;
   if (!db || isConfigPlaceholder) return;
 
@@ -961,7 +986,12 @@ window.deleteProductItem = async function(prodId) {
     const errCode = err.code || 'unknown';
     const errMsg = err.message || 'Permission denied or network failure.';
     if (errCode === 'permission-denied') {
-      showToast(`Delete failed (${errCode}): Ensure latest firestore.rules are published in Firebase Console and you own this product (${activeUser.email || activeUser.uid}).`, 'error', 6500);
+      showToast(
+        `Delete failed (permission-denied): Ensure latest firestore.rules are published in Firebase Console. ` +
+        `Your account: ${activeUser.email || activeUser.uid}. Product ownerUid: ${prod?.ownerUid || '—'}. ` +
+        `If this is a legacy document, contact zulora.help@gmail.com to delete it.`,
+        'error', 9000
+      );
     } else {
       showToast(`Delete failed: ${errMsg} (${errCode})`, 'error');
     }
@@ -1048,6 +1078,7 @@ function processSellerOrders(newOrders) {
     );
   }
   _prevOrderCount = newOrders.length;
+  _ordersReady = true;
 
   liveOrders = newOrders;
   renderSellerOrders();
@@ -1308,6 +1339,9 @@ function getStatusBadgeColor(status) {
 
 // ─── Dashboard Stats & Analytical Breakdown ──────────────────────────────────
 function updateDashboardStats() {
+  // Don't flash ₹0 before Firestore listeners have resolved on first load
+  if (!_productsReady && !_ordersReady) return;
+
   const totalSales = liveOrders.reduce((sum, o) => sum + (o.totalAmount || o.grandTotal || 0), 0);
   const deliveredRevenue = liveOrders
     .filter(o => {

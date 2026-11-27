@@ -1033,6 +1033,16 @@ window.handleCheckoutClick = function() {
     openSignInModal();
     return;
   }
+  // Location gate: buyer must have at minimum a city/town or GPS before checkout
+  const hasLoc = userLocation && (
+    (userLocation.town && userLocation.town !== 'All Locations') ||
+    userLocation.lat != null
+  );
+  if (!hasLoc) {
+    showToast('📍 Please set your City / Town or GPS location first so the seller can deliver to you.', 'warning');
+    triggerLocationModal();
+    return;
+  }
   openCheckoutModal();
 };
 
@@ -1341,6 +1351,25 @@ window.executeOrderPlacement = async function() {
       try {
         const ref = await addDoc(collection(db, 'orders'), orderData);
         docId = ref.id;
+
+        // Write a notifications doc so the seller's onSnapshot fires immediately
+        try {
+          await addDoc(collection(db, 'notifications'), {
+            type: 'new_order',
+            orderId: orderData.orderId,
+            orderDocId: docId,
+            orderCode: orderData.orderCode,
+            shopId,
+            sellerUid: orderData.sellerUid,
+            buyerName: name,
+            buyerPhone: phone,
+            totalAmount: shopTotal,
+            read: false,
+            createdAt: serverTimestamp()
+          });
+        } catch (notifErr) {
+          console.warn('[Firestore] Notification write:', notifErr);
+        }
 
         for (const item of group.items) {
           try {

@@ -79,5 +79,19 @@ service cloud.firestore {
       allow create: if true;
       allow update, delete: if isSupremeAdmin();
     }
+
+    // Notifications Collection (New order alerts for sellers)
+    match /notifications/{notifId} {
+      allow read: if request.auth != null && (
+        resource.data.sellerUid == request.auth.uid ||
+        isSupremeAdmin()
+      );
+      allow create: if true;
+      allow update: if request.auth != null && (
+        resource.data.sellerUid == request.auth.uid ||
+        isSupremeAdmin()
+      );
+      allow delete: if isSupremeAdmin();
+    }
   }
 }
